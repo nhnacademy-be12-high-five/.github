@@ -15,7 +15,7 @@ on:
         required: true
       SSH_ID:
         required: true
-      SSH_KEY:
+      SSH_PW:
         required: true
       SSH_PORT:
         required: true
@@ -41,7 +41,7 @@ jobs:
       with:
         host: ${{ secrets.SSH_IP }}
         username: ${{ secrets.SSH_ID }}
-        key: ${{ secrets.SSH_KEY }}
+        password: ${{ secrets.SSH_PW }}
         port: ${{ secrets.SSH_PORT }}
         source: "target/*.jar"
         target: "~/"
