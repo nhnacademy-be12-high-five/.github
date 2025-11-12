@@ -6,14 +6,20 @@
 # separate terms of service, privacy policy, and support
 # documentation.
 
-name: Main CI/CD
+name: Shared-Workflow
 
 on:
-  push:
-    branches: [ "main", "develop", "feat/**" ]
-  pull_request:
-    branches: [ "main", "develop", "feat/**" ]
-
+  workflow_call:
+    secrets:
+      SSH_IP:
+        required: true
+      SSH_ID:
+        required: true
+      SSH_KEY:
+        required: true
+      SSH_PORT:
+        required: true
+        
 jobs:
   build:
 
