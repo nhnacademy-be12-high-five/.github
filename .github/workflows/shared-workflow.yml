@@ -18,12 +18,6 @@ on:
       deploy-path:
         required: true
         type: string
-      jar-name:
-        required: true
-        type: string
-      run-port:
-        required: true
-        type: string
 
     secrets:
       DOCKER_USERNAME:
