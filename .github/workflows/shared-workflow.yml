@@ -71,8 +71,54 @@ jobs:
           port: ${{ secrets.SSH_PORT }}
           script: |
             cd ${{ inputs.deploy-path }}
-            docker-compose pull ${{ inputs.service-name }}
-            docker-compose up -d --no-deps ${{ inputs.service-name }}
+
+            # --- 1. 현재 활성 포트(Blue/Green) 확인 ---
+            # api_gateway_upstream.conf 파일을 읽어 현재 포트를 확인
+            CURRENT_API_PORT=$(grep -o '[0-9]\{5\}' /home/backend/be12-team5/nginx/conf.d/api_gateway_upstream.conf)
+
+            # --- 2. 배포할 대상(Idle) 환경 결정 ---
+            if [ "$CURRENT_API_PORT" == "10482" ]; then
+              # 현재 Blue가 활성 -> Green에 배포
+              echo "Current is BLUE (10482). Deploying to GREEN (10483)..."
+              TARGET_COMPOSE_FILE="docker-compose-green.yml"
+              TARGET_API_PORT="10483"
+              TARGET_FRONT_PORT="10491"
+            else
+              # 현재 Green이 활성 -> Blue에 배포
+              echo "Current is GREEN (10483). Deploying to BLUE (10482)..."
+              TARGET_COMPOSE_FILE="docker-compose-blue.yml"
+              TARGET_API_PORT="10482"
+              TARGET_FRONT_PORT="10481"
+            fi
+
+            # --- 3. 비활성(Idle) 환경에 새 버전 배포 ---
+            # 해당 서비스의 새 이미지를 PULL
+            docker-compose -f $TARGET_COMPOSE_FILE pull ${{ inputs.service-name }}
+            
+            # 새 컨테이너를 --no-deps (의존성 없이) 띄움
+            docker-compose -f $TARGET_COMPOSE_FILE up -d --no-deps ${{ inputs.service-name }}
+
+            # --- 4. (중요) 새 환경 헬스체크 ---
+            # (이 부분은 실제 헬스체크 엔드포인트로 바꿔야 함)
+            echo "Waiting for 30 seconds for service to start..."
+            sleep 30 
+            # curl http://127.0.0.1:$TARGET_API_PORT/actuator/health
+            # 헬스체크 실패 시 스크립트 중단 (exit 1) 로직 필요
+
+            # --- 5. Nginx 트래픽 전환 (Cutover) ---
+            echo "Switching Nginx traffic to $TARGET_API_PORT..."
+            echo "server 127.0.0.1:$TARGET_API_PORT;" > /home/backend/be12-team5/nginx/conf.d/api_gateway_upstream.conf
+            echo "server 127.0.0.1:$TARGET_FRONT_PORT;" > /home/backend/be12-team5/nginx/conf.d/front_upstream.conf
+
+            # --- 6. Nginx 설정 리로드 (중단 없음) ---
+            sudo nginx -s reload
+            
+            echo "Deployment successful! Traffic now routed to $TARGET_API_PORT."
+
+            # --- 7. (선택) 기존 환경 중지 ---
+            # (몇 분 뒤에 실행하거나, 다음 배포 시 덮어쓰므로 생략 가능)
+            
+            # --- 8. 불필요한 이미지 정리 ---
             docker image prune -f
             
           
