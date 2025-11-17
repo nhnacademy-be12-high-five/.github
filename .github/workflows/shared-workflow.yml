@@ -1,11 +1,3 @@
-# This workflow will build a Java project with Maven, and cache/restore any dependencies to improve the workflow execution time
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-java-with-maven
-
-# This workflow uses actions that are not certified by GitHub.
-# They are provided by a third-party and are governed by
-# separate terms of service, privacy policy, and support
-# documentation.
-
 # 공통 레포지토리
 name: Common Workflow
 
@@ -61,58 +53,53 @@ jobs:
           context: .
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/${{ inputs.service-name }}:latest
+
+      # 🔽 [수정됨] 들여쓰기를 steps 레벨로 수정
+      - name: Deploy to EC2 via SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SSH_IP }}
+          username: ${{ secrets.SSH_ID }}
+          password: ${{ secrets.SSH_PW }}
+          port: ${{ secrets.SSH_PORT }}
+          script: |
+            DEPLOY_PATH="~/www/nhnbook"
+            NGINX_CONF_PATH="/home/backend/be12-team5/nginx"
             
-            # ... (Common Workflow의 script: 부분) ...
-                  - name: Deploy to EC2 via SSH
-                  uses: appleboy/ssh-action@master
-                  with:
-                    host: ${{ secrets.SSH_IP }}
-                    username: ${{ secrets.SSH_ID }}
-                    password: ${{ secrets.SSH_PW }}
-                    port: ${{ secrets.SSH_PORT }}
-                    script: |
-                      DEPLOY_PATH="~/www/nhnbook"
-                      NGINX_CONF_PATH="/home/backend/be12-team5/nginx"
-                      
-                      # --- 🔵 API 포트 정의 (요청대로 수정) ---
-                      BLUE_API_PORT="10485"
-                      GREEN_API_PORT="10486"
-                      
-                      cd $DEPLOY_PATH
-                      
-                      # --- 1. 현재 활성 'API' 포트 확인 ---
-                      CURRENT_API_PORT=$(grep -o '[0-9]\{5\}' $NGINX_CONF_PATH/conf.d/api_gateway_upstream.conf)
-                      
-                      # --- 2. 배포할 대상(Idle) 환경 결정 ---
-                      if [ "$CURRENT_API_PORT" == "$BLUE_API_PORT" ]; then
-                        echo "Current API is BLUE ($BLUE_API_PORT). Deploying to GREEN ($GREEN_API_PORT)..."
-                        TARGET_COMPOSE_FILE="docker-compose-green.yml"
-                        TARGET_API_PORT=$GREEN_API_PORT
-                      else
-                        echo "Current API is GREEN ($GREEN_API_PORT). Deploying to BLUE ($BLUE_API_PORT)..."
-                        TARGET_COMPOSE_FILE="docker-compose-blue.yml"
-                        TARGET_API_PORT=$BLUE_API_PORT
-                      fi
-                      
-                      # --- 3. 비활성(Idle) 환경에 새 버전 배포 ---
-                      docker-compose -f docker-compose-infra.yml -f $TARGET_COMPOSE_FILE pull ${{ inputs.service-name }}
-                      docker-compose -f docker-compose-infra.yml -f $TARGET_COMPOSE_FILE up -d --no-deps ${{ inputs.service-name }}
-                      
-                      # --- 4. 헬스체크 (간단히 sleep) ---
-                      echo "Waiting for 30 seconds for service to start..."
-                      sleep 30 
-                      
-                      # --- 5. Nginx 'API' 트래픽 전환 ---
-                      echo "Switching Nginx traffic to $TARGET_API_PORT..."
-                      echo "server 127.0.0.1:$TARGET_API_PORT;" > $NGINX_CONF_PATH/conf.d/api_gateway_upstream.conf
-                      
-                      # 🚨 front_upstream.conf 관련 코드를 반드시 삭제해야 합니다.
-                      
-                      # --- 6. Nginx 설정 리로드 (중단 없음) ---
-                      sudo nginx -s reload
-                      
-                      echo "Deployment successful! API traffic now routed to $TARGET_API_PORT."
-                      docker image prune -f
+            # --- 🔵 API 포트 정의 (요청대로 수정) ---
+            BLUE_API_PORT="10485"
+            GREEN_API_PORT="10486"
             
-          
+            cd $DEPLOY_PATH
             
+            # --- 1. 현재 활성 'API' 포트 확인 ---
+            CURRENT_API_PORT=$(grep -o '[0-9]\{5\}' $NGINX_CONF_PATH/conf.d/api_gateway_upstream.conf)
+            
+            # --- 2. 배포할 대상(Idle) 환경 결정 ---
+            if [ "$CURRENT_API_PORT" == "$BLUE_API_PORT" ]; then
+              echo "Current API is BLUE ($BLUE_API_PORT). Deploying to GREEN ($GREEN_API_PORT)..."
+              TARGET_COMPOSE_FILE="docker-compose-green.yml"
+              TARGET_API_PORT=$GREEN_API_PORT
+            else
+              echo "Current API is GREEN ($GREEN_API_PORT). Deploying to BLUE ($BLUE_API_PORT)..."
+              TARGET_COMPOSE_FILE="docker-compose-blue.yml"
+              TARGET_API_PORT=$BLUE_PORT
+            fi
+            
+            # --- 3. 비활성(Idle) 환경에 새 버전 배포 ---
+            docker-compose -f docker-compose-infra.yml -f $TARGET_COMPOSE_FILE pull ${{ inputs.service-name }}
+            docker-compose -f docker-compose-infra.yml -f $TARGET_COMPOSE_FILE up -d --no-deps ${{ inputs.service-name }}
+            
+            # --- 4. 헬스체크 (간단히 sleep) ---
+            echo "Waiting for 30 seconds for service to start..."
+            sleep 30 
+            
+            # --- 5. Nginx 'API' 트래픽 전환 ---
+            echo "Switching Nginx traffic to $TARGET_API_PORT..."
+            echo "server 127.0.0.1:$TARGET_API_PORT;" > $NGINX_CONF_PATH/conf.d/api_gateway_upstream.conf
+            
+            # --- 6. Nginx 설정 리로드 (중단 없음) ---
+            sudo nginx -s reload
+            
+            echo "Deployment successful! API traffic now routed to $TARGET_API_PORT."
+            docker image prune -f
