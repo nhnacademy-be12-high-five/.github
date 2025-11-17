@@ -3,7 +3,6 @@
  <img width="150" height="150" alt="Image" src="https://github.com/user-attachments/assets/2386fd55-1bd9-4807-8a3f-540fa49391c8" />
   <h1>High-five</h1>
 </div>
-<br/>
 
 <h2>프로젝트 소개</h2>
 <div>
