@@ -1,5 +1,8 @@
 
-<h1>High-five</h1>
+<div style="display:flex, flex-direction:row">
+  <img src="">
+  <h1>High-five</h1>
+</div>
 <br/>
 
 <h2>프로젝트 소개</h2>
