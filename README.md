@@ -1,6 +1,6 @@
 
-<div style="display:flex, flex-direction:row">
-  <img src="">
+<div style="display: flex; flex-direction:row; align-items: center;">
+ <img width="150" height="150" alt="Image" src="https://github.com/user-attachments/assets/2386fd55-1bd9-4807-8a3f-540fa49391c8" />
   <h1>High-five</h1>
 </div>
 <br/>
