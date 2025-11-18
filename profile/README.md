@@ -12,6 +12,47 @@
 <h4>개발기간 : 2025.11.11 ~ </h4>
 
 <h4>팀원 소개</h4>
+<table align="center">
+  <tbody>
+    <tr>
+      <td align="center">
+       <img src="https://github.com/user-attachments/assets/8e8e7511-e03b-4a57-bd55-93f0b1083615" width="80" height="80" /><br />
+        <b>장성우</b><br />
+        역할 입력
+      </td>
+      <td align="center">
+        <img src="https://github.com/user-attachments/assets/26034b34-8816-40ab-aa68-e694a4937737" width="80" height="80" alt="프로필4"/><br />
+        <b>류태훈</b><br />
+        역할 입력
+      </td>
+      <td align="center">
+        <img src="https://github.com/user-attachments/assets/0de8ff0f-9039-4817-b5a9-f9d86fb0da61" width="80" height="80" alt="혜준"/><br />
+        <b>권혜준</b><br />
+        역할 입력
+      </td>      
+      <td align="center">
+        <img src="https://github.com/user-attachments/assets/f9f12c32-6da4-405d-9d18-3c3c62f209c6" width="80" height="80" alt="프로필2"/><br />
+        <b>곽유나</b><br/>
+        역할 입력
+      </td>
+      <td align="center">
+        <img src="https://github.com/user-attachments/assets/8aab8d65-7059-4691-8d3b-2c44eaf76589" width="80" height="80" alt="프로필5"/><br />
+        <b>김태양</b><br />
+        역할 입력
+      </td>
+      <td align="center">
+        <img src="https://github.com/user-attachments/assets/3bffc0e0-fc1b-4e00-a840-a3ab4264a37f" width="80" height="80" alt="프로필3"/><br />
+        <b>김진영</b><br />
+        역할 입력
+      </td>
+     <td align="center">
+        <img src="https://github.com/user-attachments/assets/1b5449a4-170c-4c43-a5a6-4057efc4146f" width="80" height="80" alt="프로필1"/><br />
+        <b>송도혁</b><br/>
+        역할 입력
+      </td>
+    </tr>
+  </tbody>
+</table>
 
 <h4>주요기능</h4>
 
