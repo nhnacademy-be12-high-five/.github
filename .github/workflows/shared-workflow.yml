@@ -26,7 +26,6 @@ on:
       SSH_PORT:
         required: true
 
-
 jobs:
   build-push-and-deploy:
     runs-on: ubuntu-latest
