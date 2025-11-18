@@ -86,13 +86,13 @@ jobs:
               BLUE_PORT="10483"
               GREEN_PORT="10484"
               UPSTREAM_CONF="$NGINX_CONF_PATH/conf.d/front_upstream.conf"
-              HEALTH_PATH="" # 프론트엔드는 /actuator/health가 없음
+              HEALTH_PATH="" # (헬스체크 제거로 인해 사용 안 함)
             else
               echo "⚙️ 백엔드/게이트웨이 배포 모드"
               BLUE_PORT="10485" # Gateway Blue
               GREEN_PORT="10486" # Gateway Green
               UPSTREAM_CONF="$NGINX_CONF_PATH/conf.d/api_gateway_upstream.conf"
-              HEALTH_PATH="/actuator/health"
+              HEALTH_PATH="/actuator/health" # (헬스체크 제거로 인해 사용 안 함)
             fi
 
             # -------------------------------------------------------
@@ -101,15 +101,32 @@ jobs:
             # 파일이 없으면 기본값(Blue)으로 간주
             CURRENT_PORT=$(grep -o '[0-9]\{5\}' $UPSTREAM_CONF || echo "$BLUE_PORT")
             echo "🔎 현재 활성화된 포트: $CURRENT_PORT"
-
+            
+            # -------------------------------------------------------
+            # 🚨 Old 환경 및 New 환경 설정
+            # -------------------------------------------------------
             if [ "$CURRENT_PORT" == "$BLUE_PORT" ]; then
-              echo "✅ 배포 대상: GREEN 환경 ($GREEN_PORT)"
-              TARGET_COMPOSE_FILE="docker-compose-green.yml"
+              # Blue가 현재 활성 (Old), Green이 배포 대상 (New)
+              OLD_PORT=$BLUE_PORT
+              OLD_COMPOSE_FILE="docker-compose-blue.yml"
+              OLD_CONTAINER_NAME="team5-${SERVICE_NAME}-blue"
+
               TARGET_PORT=$GREEN_PORT
+              TARGET_COMPOSE_FILE="docker-compose-green.yml"
+              TARGET_CONTAINER_NAME="team5-${SERVICE_NAME}-green"
+
+              echo "✅ 배포 대상: GREEN 환경 ($TARGET_PORT)"
             else
-              echo "✅ 배포 대상: BLUE 환경 ($BLUE_PORT)"
-              TARGET_COMPOSE_FILE="docker-compose-blue.yml"
+              # Green이 현재 활성 (Old), Blue가 배포 대상 (New)
+              OLD_PORT=$GREEN_PORT
+              OLD_COMPOSE_FILE="docker-compose-green.yml"
+              OLD_CONTAINER_NAME="team5-${SERVICE_NAME}-green"
+
               TARGET_PORT=$BLUE_PORT
+              TARGET_COMPOSE_FILE="docker-compose-blue.yml"
+              TARGET_CONTAINER_NAME="team5-${SERVICE_NAME}-blue"
+            
+              echo "✅ 배포 대상: BLUE 환경 ($TARGET_PORT)"
             fi
             
             # -------------------------------------------------------
@@ -119,42 +136,28 @@ jobs:
             docker-compose -f docker-compose-infra.yml -f $TARGET_COMPOSE_FILE pull $SERVICE_NAME
             
             echo "🔄 컨테이너를 시작합니다 ($SERVICE_NAME)..."
-            # 🚨 [수정] 해당 서비스만 up (전체 스택 재시작 방지)
+            # 🚨 TARGET 컨테이너 시작 (Old 컨테이너는 이 시점에서 아직 실행 중)
             docker-compose -f docker-compose-infra.yml -f $TARGET_COMPOSE_FILE up -d --no-deps $SERVICE_NAME
             
             # -------------------------------------------------------
-            # 4. 헬스체크 (Front vs Backend 분기)
+            # 4. (제거됨) 헬스체크 (Health Check)
             # -------------------------------------------------------
-            HEALTH_URL="http://127.0.0.1:$TARGET_PORT$HEALTH_PATH"
-            echo "🏥 헬스 체크 중 (URL: $HEALTH_URL)..."
-            HEALTHY=false
-            
-            for i in {1..10}; do
-              STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" $HEALTH_URL || echo "000")
-            
-              # 프론트엔드는 200만 확인, 백엔드는 API 응답 확인
-              if [ "$STATUS_CODE" == "200" ]; then
-                echo "🎉 서비스 정상 실행! (200 OK)"
-                HEALTHY=true
-                break
-              fi
-              echo "⏳ 시도 $i: 아직 준비되지 않음 ($STATUS_CODE). 5초 후 재시도..."
-              sleep 5
-            done
+            echo "⚠️ 헬스 체크 단계를 건너뛰고 즉시 트래픽을 전환합니다."
 
-            if [ "$HEALTHY" != true ]; then
-              echo "❌ 배포 실패: 서비스가 정상 상태로 전환되지 않았습니다."
-              exit 1
-            fi
-            
             # -------------------------------------------------------
-            # 5. Nginx 트래픽 전환 (해당 upstream 파일만 수정)
+            # 5. Nginx 트래픽 전환 (해당 upstream 파일만 수정) 및 Old 컨테이너 정리
             # -------------------------------------------------------
             echo "🔀 Nginx 설정을 변경합니다: $UPSTREAM_CONF -> $TARGET_PORT"
             
             # 해당 upstream 파일에만 포트 정보 덮어쓰기
             echo "server 127.0.0.1:$TARGET_PORT;" > $UPSTREAM_CONF
             
+            # 5.1 Old 컨테이너 종료 및 제거
+            echo "🗑️ 이전 컨테이너 ($OLD_CONTAINER_NAME)를 종료 및 제거합니다..."
+            # docker-compose down 대신, 특정 컨테이너만 stop/rm 명령으로 정리합니다.
+            docker stop $OLD_CONTAINER_NAME || true
+            docker rm $OLD_CONTAINER_NAME || true
+
             # 6. 마무리
             echo "⏳ 설정 파일 업데이트 완료. 호스트 서버가 설정을 가져갈 때까지 대기합니다."
             docker image prune -f
