@@ -18,10 +18,10 @@
 <h4>개발환경</h4>
 
 <div>
-  <img src="https://img.shields.io/badge/HTML5-E34F26?style=flat-square&logo=html5&logoColor=white"/></a>
-  <img src="https://img.shields.io/badge/CSS-663399?style=flat-square&logo=css&logoColor=white"/></a>
-  <img src="https://img.shields.io/badge/JavaScript-F7DF1E?style=flat-square&logo=css&logoColor=white"/></a><br/>
+  <img src="https://img.shields.io/badge/html5-E34F26?style=for-the-badge&logo=html5&logoColor=white"> 
+  <img src="https://img.shields.io/badge/css-1572B6?style=for-the-badge&logo=css3&logoColor=white"> 
+  <img src="https://img.shields.io/badge/javascript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black"> <br/>
   <img src="https://img.shields.io/badge/java-007396?style=for-the-badge&logo=java&logoColor=white"> 
   <img src="https://img.shields.io/badge/spring-6DB33F?style=for-the-badge&logo=spring&logoColor=white"> 
-  <img src="https://img.shields.io/badge/elasticsearch-005571?style=flat-square&logo=springboot&logoColor=white"/></a>
+  <img src="https://img.shields.io/badge/elasticsearch-005571?style=for-the-badge&logo=springboot&logoColor=white"/></a>
 </div>
