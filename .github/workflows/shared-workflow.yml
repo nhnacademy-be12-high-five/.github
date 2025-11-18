@@ -1,5 +1,4 @@
-# 공통 레포지토리
-name: Common Workflow
+name: Common Workflow (Reusable Docker Blue/Green Deploy)
 
 on:
   workflow_call:
@@ -7,6 +6,8 @@ on:
       service-name:
         required: true
         type: string
+      # [참고] deploy-path 입력은 이 스크립트에서 사용되지 않아 제거 가능합니다.
+      # (스크립트 내부에 'DEPLOY_PATH'가 하드코딩 되어 있습니다.)
       deploy-path:
         required: true
         type: string
@@ -25,6 +26,11 @@ on:
       SSH_PORT:
         required: true
 
+# [수정 1] 403 오류를 해결하기 위해 'dependency-graph: write' 권한 추가
+permissions:
+  contents: read
+  dependency-graph: write
+
 jobs:
   build-push-and-deploy:
     runs-on: ubuntu-latest
@@ -41,6 +47,10 @@ jobs:
       - name: Build with Maven
         run: mvn clean package
 
+      # [추가] 403 오류가 났던 의존성 그래프 스캔
+      - name: Update dependency graph
+        uses: advanced-security/maven-dependency-submission-action@v4
+
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
@@ -54,8 +64,7 @@ jobs:
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/${{ inputs.service-name }}:latest
 
-      # 🔽 [수정됨] 들여쓰기를 steps 레벨로 수정
-      - name: Deploy to EC2 via SSH
+      - name: Deploy to EC2 via SSH (Blue/Green)
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.SSH_IP }}
@@ -66,7 +75,7 @@ jobs:
             DEPLOY_PATH="~/www/nhnbook"
             NGINX_CONF_PATH="/home/backend/be12-team5/nginx"
             
-            # --- 🔵 API 포트 정의 (요청대로 수정) ---
+            # --- 🔵 API 포트 정의 ---
             BLUE_API_PORT="10485"
             GREEN_API_PORT="10486"
             
@@ -83,22 +92,49 @@ jobs:
             else
               echo "Current API is GREEN ($GREEN_API_PORT). Deploying to BLUE ($BLUE_API_PORT)..."
               TARGET_COMPOSE_FILE="docker-compose-blue.yml"
-              TARGET_API_PORT=$BLUE_PORT
+              # [수정 2] $BLUE_PORT -> $BLUE_API_PORT (치명적인 오타 수정)
+              TARGET_API_PORT=$BLUE_API_PORT
             fi
             
             # --- 3. 비활성(Idle) 환경에 새 버전 배포 ---
-            docker-compose -f docker-compose-infra.yml -f $TARGET_COMPOSE_FILE pull ${{ inputs.service-name }}
-            docker-compose -f docker-compose-infra.yml -f $TARGET_COMPOSE_FILE up -d --no-deps ${{ inputs.service-name }}
+            # [수정 3] 특정 서비스만 pull/up 하는 것이 아니라,
+            # Blue/Green 스택 전체를 pull/up 해야 합니다.
+            # (Docker가 변경된 이미지만 pull 하므로 효율적입니다)
+            echo "Pulling latest images for $TARGET_COMPOSE_FILE..."
+            docker-compose -f docker-compose-infra.yml -f $TARGET_COMPOSE_FILE pull
             
-            # --- 4. 헬스체크 (간단히 sleep) ---
-            echo "Waiting for 30 seconds for service to start..."
-            sleep 30 
+            echo "Starting $TARGET_COMPOSE_FILE..."
+            docker-compose -f docker-compose-infra.yml -f $TARGET_COMPOSE_FILE up -d --no-deps
+            
+            # --- 4. 헬스체크 (단순 sleep 대신 curl로 변경) ---
+            echo "Waiting for stack (Port: $TARGET_API_PORT) to be healthy..."
+            HEALTHY=false
+            # (actuator/health 엔드포인트가 있다고 가정합니다)
+            for i in {1..20}; do # 100초간 (20회 * 5초) 시도
+              STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:$TARGET_API_PORT/actuator/health)
+            
+              if [ "$STATUS_CODE" == "200" ]; then
+                echo "Stack is healthy! (Status: $STATUS_CODE)"
+                HEALTHY=true
+                break
+              fi
+            
+              echo "Attempt $i: Not yet healthy (Status: $STATUS_CODE). Retrying in 5 seconds..."
+              sleep 5
+            done
+
+            if [ "$HEALTHY" != true ]; then
+              echo "DEPLOYMENT FAILED: Stack did not become healthy in time."
+              # (선택) 롤백이 필요한 경우 여기에 docker-compose down $TARGET_COMPOSE_FILE
+              exit 1
+            fi
             
             # --- 5. Nginx 'API' 트래픽 전환 ---
             echo "Switching Nginx traffic to $TARGET_API_PORT..."
             echo "server 127.0.0.1:$TARGET_API_PORT;" > $NGINX_CONF_PATH/conf.d/api_gateway_upstream.conf
             
             # --- 6. Nginx 설정 리로드 (중단 없음) ---
+            # (ec2-user가 'nginx -s reload'를 sudo 없이 실행할 수 있어야 합니다)
             sudo nginx -s reload
             
             echo "Deployment successful! API traffic now routed to $TARGET_API_PORT."
