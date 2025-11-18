@@ -26,11 +26,6 @@ on:
       SSH_PORT:
         required: true
 
-# 권한 설정 (Dependency Submission Action 403 오류 해결용)
-permissions:
-  contents: read
-  dependency-graph: write
-
 jobs:
   build-push-and-deploy:
     runs-on: ubuntu-latest
