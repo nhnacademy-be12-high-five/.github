@@ -23,7 +23,7 @@ on:
         required: true
       DOCKER_PASSWORD:
         required: true
-      SSH_HOST:
+      SSH_IP:
         required: true
       SSH_ID:
         required: true
@@ -74,7 +74,7 @@ jobs:
       - name: 서버 배포 (SSH)
         uses: appleboy/ssh-action@master
         with:
-          host: ${{ secrets.SSH_HOST }}
+          host: ${{ secrets.SSH_IP }}
           username: ${{ secrets.SSH_ID }}
           password: ${{ secrets.SSH_PW }}
           port: ${{ secrets.SSH_PORT }}
