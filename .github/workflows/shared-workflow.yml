@@ -40,15 +40,7 @@ jobs:
 
       # 3. Maven 빌드 + SonarQube 분석
       - name: Maven 빌드 및 SonarQube 분석
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: http://s4.java21.net:9000
-        run: mvn clean package org.sonarsource.scanner.maven:sonar-maven-plugin:4.0.0.4121:sonar \
-          -Dsonar.projectKey=${{ inputs.project-key }} \
-          -Dsonar.projectName=${{ inputs.project-key }} \
-          -Dsonar.host.url=$SONAR_HOST_URL \
-          -Dsonar.login=$SONAR_TOKEN \
-          ${{ inputs.maven-args }}
+        run: mvn clean package sonar:sonar -Dsonar.projectKey=${{ inputs.project-key }} -Dsonar.host.url=http://s4.java21.net:9000 -Dsonar.login=${{ secrets.SONAR_TOKEN }} ${{ inputs.maven-args }}
 
       # 4. Docker Hub 로그인
       - name: Docker Hub 로그인
