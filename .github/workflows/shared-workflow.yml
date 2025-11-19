@@ -19,6 +19,18 @@ on:
     secrets:
       SONAR_TOKEN:
         required: true
+      DOCKER_USERNAME:
+        required: true
+      DOCKER_PASSWORD:
+        required: true
+      SSH_HOST:
+        required: true
+      SSH_ID:
+        required: true
+      SSH_PW:
+        required: true
+      SSH_PORT:
+        required: false
 
 
 jobs:
