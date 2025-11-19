@@ -12,16 +12,6 @@ on:
       container-name:
         required: true
         type: string
-      ssh-host:
-        required: true
-        type: string
-      ssh-username:
-        required: true
-        type: string
-      ssh-port:
-        required: false
-        type: number
-        default: 22
       maven-args:
         required: false
         type: string
@@ -29,12 +19,7 @@ on:
     secrets:
       SONAR_TOKEN:
         required: true
-      DOCKER_USERNAME:
-        required: true
-      DOCKER_PASSWORD:
-        required: true
-      SSH_PASSWORD:
-        required: true
+
 
 jobs:
   build_deploy:
@@ -58,8 +43,12 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: http://s4.java21.net:9000
-        run: mvn clean package org.sonarsource.scanner.maven:sonar-maven-plugin:4.0.0.4121:sonar -Dsonar.projectKey=${{ inputs.project-key }} -Dsonar.projectName=${{ inputs.project-key }} -Dsonar.host.url=http://s4.java21.net:9000 -Dsonar.login=${{ secrets.SONAR_TOKEN }} ${{ inputs.maven-args }}
-      # 오류 방지를 위해 한 줄로 실행
+        run: mvn clean package org.sonarsource.scanner.maven:sonar-maven-plugin:4.0.0.4121:sonar \
+          -Dsonar.projectKey=${{ inputs.project-key }} \
+          -Dsonar.projectName=${{ inputs.project-key }} \
+          -Dsonar.host.url=$SONAR_HOST_URL \
+          -Dsonar.login=$SONAR_TOKEN \
+          ${{ inputs.maven-args }}
 
       # 4. Docker Hub 로그인
       - name: Docker Hub 로그인
@@ -81,25 +70,25 @@ jobs:
       - name: 서버 배포 (SSH)
         uses: appleboy/ssh-action@master
         with:
-          host: ${{ inputs.ssh-host }}
-          username: ${{ inputs.ssh-username }}
-          password: ${{ secrets.SSH_PASSWORD }}
-          port: ${{ inputs.ssh-port }}
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_ID }}
+          password: ${{ secrets.SSH_PW }}
+          port: ${{ secrets.SSH_PORT }}
           script: |
             echo "🚀 배포 시작..."
             cd ~/www/nhnbook
-
+            
             SERVICE_NAME="${{ inputs.container-name }}"
-
+            
             echo "🛑 기존 컨테이너 중지..."
             docker stop $SERVICE_NAME || true
             docker rm $SERVICE_NAME || true
-
+            
             echo "📥 최신 이미지 Pull..."
             docker-compose pull $SERVICE_NAME
-
+            
             echo "🔄 컨테이너 시작..."
             docker-compose up -d --no-deps $SERVICE_NAME
-
+            
             docker image prune -f
             echo "✅ 배포 완료!"
