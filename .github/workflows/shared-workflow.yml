@@ -29,8 +29,6 @@ on:
     secrets:
       SONAR_TOKEN:
         required: true
-      SONAR_HOST:
-        required: true
       DOCKER_USERNAME:
         required: true
       DOCKER_PASSWORD:
