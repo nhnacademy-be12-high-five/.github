@@ -30,7 +30,7 @@ on:
       SSH_PW:
         required: true
       SSH_PORT:
-        required: false
+        required: true
 
 
 jobs:
