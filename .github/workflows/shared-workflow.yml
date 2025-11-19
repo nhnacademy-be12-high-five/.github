@@ -39,7 +39,7 @@ on:
         required: true
 
 jobs:
-  빌드_배포:
+  build_deploy:
     runs-on: ubuntu-latest
 
     steps:
