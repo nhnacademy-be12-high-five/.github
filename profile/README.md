@@ -1,7 +1,7 @@
 
 <div align="center">
     <img src="https://github.com/user-attachments/assets/2386fd55-1bd9-4807-8a3f-540fa49391c8" width="150" height="150" alt="High-five Logo"/>
-    <h1>✨ High-five 온라인 서점 ✨</h1>
+    <h1> 📚 High-five 서점 </h1>
     <p><strong>어린아이부터 성인까지, 책을 쉽고 즐겁게 접근할 수 있도록 돕는 사용자 친화적 온라인 서점입니다.</strong></p>
 </div>
 <h4>개발기간 : 2025.11.11 ~ </h4>
