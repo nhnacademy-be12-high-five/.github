@@ -32,7 +32,6 @@ on:
       SSH_PORT:
         required: true
 
-
 jobs:
   build_deploy:
     runs-on: ubuntu-latest
@@ -70,7 +69,7 @@ jobs:
           push: true
           tags: ${{ inputs.docker-image }}:latest
 
-      # 6. 서버 접속 및 배포
+      # 6. 서버 접속 및 배포 (롤링 업데이트 적용)
       - name: 서버 배포 (SSH)
         uses: appleboy/ssh-action@master
         with:
@@ -79,20 +78,22 @@ jobs:
           password: ${{ secrets.SSH_PW }}
           port: ${{ secrets.SSH_PORT }}
           script: |
-            echo "🚀 배포 시작..."
+            echo "🚀 배포 시작 (Rolling Update)..."
             cd ~/www/nhnbook
             
             SERVICE_NAME="${{ inputs.container-name }}"
             
-            echo "🛑 기존 컨테이너 중지..."
-            docker stop $SERVICE_NAME || true
-            docker rm $SERVICE_NAME || true
+            # [중요] 롤링 배포를 위해 기존 컨테이너를 강제로 끄지 않습니다.
+            # (docker stop, docker rm 삭제됨)
             
             echo "📥 최신 이미지 Pull..."
             docker-compose pull $SERVICE_NAME
             
-            echo "🔄 컨테이너 시작..."
-            docker-compose up -d --no-deps $SERVICE_NAME
+            echo "🔄 롤링 배포 시작..."
+            # up -d 명령어가 실행되면 docker-compose.yml의 'start-first' 설정에 따라
+            # 새 컨테이너 생성 -> 실행 확인 -> 기존 컨테이너 종료 순으로 진행됩니다.
+            docker-compose up -d $SERVICE_NAME
             
+            # 불필요한 이미지 정리
             docker image prune -f
-            echo "✅ 배포 완료!"
+            echo "✅ 배포 명령 전달 완료!"
