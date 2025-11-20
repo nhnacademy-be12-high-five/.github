@@ -53,7 +53,6 @@
 
 <!-- // Key Features (주요 기능)  -->
 <!-- 프로젝트 구조 추가 -->
-<h4>개발환경</h4>
 
 <div align=center><h1>📚 STACKS</h1></div>
 <div align=center>
