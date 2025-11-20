@@ -83,16 +83,16 @@ jobs:
             
             SERVICE_NAME="${{ inputs.container-name }}"
             
-            # [중요] 롤링 배포를 위해 기존 컨테이너를 강제로 끄지 않습니다.
-            # (docker stop, docker rm 삭제됨)
+            # [롤링 배포를 위해 기존 컨테이너 강제 종료(stop/rm) 삭제됨]
             
             echo "📥 최신 이미지 Pull..."
-            docker-compose pull $SERVICE_NAME
+            # [수정] docker-compose -> docker compose (하이픈 제거!)
+            docker compose pull $SERVICE_NAME
             
             echo "🔄 롤링 배포 시작..."
-            # up -d 명령어가 실행되면 docker-compose.yml의 'start-first' 설정에 따라
-            # 새 컨테이너 생성 -> 실행 확인 -> 기존 컨테이너 종료 순으로 진행됩니다.
-            docker-compose up -d $SERVICE_NAME
+            # [수정] docker-compose -> docker compose (하이픈 제거!)
+            # up -d 실행 시 start-first 전략에 따라 무중단 교체됨
+            docker compose up -d $SERVICE_NAME
             
             # 불필요한 이미지 정리
             docker image prune -f
