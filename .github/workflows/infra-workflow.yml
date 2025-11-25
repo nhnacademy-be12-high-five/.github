@@ -82,11 +82,13 @@ jobs:
             docker-compose -f $COMPOSE_FILE up -d $SERVICE_NAME
 
             # 헬스 체크 포트 결정
-            PORT=8080
+            PORT=8080   # 기본값 
             if [ "$SERVICE_NAME" = "eureka_server" ]; then
-              PORT=10481
+            PORT=10481   # docker-compose 외부포트
             elif [ "$SERVICE_NAME" = "config_server" ]; then
-              PORT=8888
+            PORT=10482   # docker-compose 외부포트
+            elif [ "$SERVICE_NAME" = "gateway_server" ]; then
+            PORT=10485   # docker-compose 외부포트
             fi
 
             HEALTHY=false
