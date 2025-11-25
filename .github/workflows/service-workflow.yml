@@ -1,0 +1,99 @@
+name: MSA 서비스 공용 워크플로우
+
+on:
+  workflow_call:
+    inputs:
+      project-key:
+        required: true
+        type: string
+      docker-image:
+        required: true
+        type: string
+      container-name:
+        required: true
+        type: string
+      maven-args:
+        required: false
+        type: string
+        default: ""
+    secrets:
+      SONAR_TOKEN:
+        required: true
+      DOCKER_USERNAME:
+        required: true
+      DOCKER_PASSWORD:
+        required: true
+      SSH_IP:
+        required: true
+      SSH_ID:
+        required: true
+      SSH_PW:
+        required: true
+      SSH_PORT:
+        required: true
+
+jobs:
+  build_deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. 코드 체크아웃
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+
+      # 2. JDK 설정
+      - name: JDK 21 설정
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      # 3. Maven 빌드 + SonarQube 분석
+      - name: Maven 빌드 및 SonarQube 분석
+        run: mvn clean package sonar:sonar -Dsonar.projectKey=${{ inputs.project-key }} -Dsonar.host.url=http://s4.java21.net:9000 -Dsonar.login=${{ secrets.SONAR_TOKEN }} ${{ inputs.maven-args }}
+
+      # 4. Docker Hub 로그인
+      - name: Docker Hub 로그인
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      # 5. Docker 이미지 빌드 및 푸시
+      - name: Docker 이미지 빌드 및 푸시
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ inputs.docker-image }}:latest
+
+      # 6. 서버 접속 및 배포 (롤링 업데이트 적용)
+      - name: 서버 배포 (SSH)
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SSH_IP }}
+          username: ${{ secrets.SSH_ID }}
+          password: ${{ secrets.SSH_PW }}
+          port: ${{ secrets.SSH_PORT }}
+          script: |
+            echo "🚀 배포 시작 (Rolling Update)..."
+            cd ~/www/nhnbook
+            
+            SERVICE_NAME="${{ inputs.container-name }}"
+            
+            # [롤링 배포를 위해 기존 컨테이너 강제 종료(stop/rm) 삭제됨]
+            
+            echo "📥 최신 이미지 Pull..."
+            # [수정] docker-compose -> docker compose (하이픈 제거!)
+            docker compose pull $SERVICE_NAME
+            
+            echo "🔄 롤링 배포 시작..."
+            # [수정] docker-compose -> docker compose (하이픈 제거!)
+            # up -d 실행 시 start-first 전략에 따라 무중단 교체됨
+            docker compose up -d $SERVICE_NAME
+            
+            # 불필요한 이미지 정리
+            docker image prune -f
+            echo "✅ 배포 명령 전달 완료!"
