@@ -70,7 +70,7 @@ jobs:
           tags: ${{ inputs.docker-image }}:latest
 
       # 6. 서버 접속 및 배포 (롤링 업데이트 적용)
-      - name: 서버 배포 (SSH)
+      - name: 서버 배포 (SSH, Rolling)
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.SSH_IP }}
@@ -78,22 +78,35 @@ jobs:
           password: ${{ secrets.SSH_PW }}
           port: ${{ secrets.SSH_PORT }}
           script: |
-            echo "🚀 배포 시작 (Rolling Update)..."
+            echo "🚀 $SERVICE_NAME 배포 시작 (Rolling Update)..."
             cd ~/www/nhnbook
-            
-            SERVICE_NAME="${{ inputs.container-name }}"
-            
-            # [롤링 배포를 위해 기존 컨테이너 강제 종료(stop/rm) 삭제됨]
-            
-            echo "📥 최신 이미지 Pull..."
-            # [수정] docker-compose -> docker compose (하이픈 제거!)
-            docker compose pull $SERVICE_NAME
-            
-            echo "🔄 롤링 배포 시작..."
-            # [수정] docker-compose -> docker compose (하이픈 제거!)
-            # up -d 실행 시 start-first 전략에 따라 무중단 교체됨
-            docker compose up -d $SERVICE_NAME
-            
-            # 불필요한 이미지 정리
+
+            SERVICE_BASE="${{ inputs.container-name }}"
+
+            for INSTANCE in 1 2; do
+              CONTAINER_NAME="${SERVICE_BASE}_${INSTANCE}"
+              echo "🔄 $CONTAINER_NAME 배포..."
+
+              docker compose pull $CONTAINER_NAME
+              docker compose up -d $CONTAINER_NAME
+            done
+
+            # 필요시 Gateway로 헬스체크 가능
+            HEALTHY=false
+            for i in {1..10}; do
+              STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:10485/actuator/health || echo "000")
+              if [ "$STATUS" == "200" ]; then
+                HEALTHY=true
+                break
+              fi
+              echo "⏳ 시도 $i: 아직 준비되지 않음 ($STATUS)"
+              sleep 5
+            done
+
+            if [ "$HEALTHY" != true ]; then
+              echo "❌ 배포 실패: Gateway가 준비되지 않음"
+              exit 1
+            fi
+
             docker image prune -f
-            echo "✅ 배포 명령 전달 완료!"
+            echo "✅ $SERVICE_BASE 배포 완료!"
