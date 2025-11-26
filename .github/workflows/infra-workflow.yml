@@ -12,7 +12,7 @@ on:
       compose-file:
         required: false
         type: string
-        default: "docker-compose.infra.yml"
+        default: "docker-compose.yml"
 
     secrets:
       DOCKER_USERNAME:
@@ -75,37 +75,46 @@ jobs:
             SERVICE_NAME="${{ inputs.service-name }}"
             COMPOSE_FILE="${{ inputs.compose-file }}"
 
+            docker compose -f $COMPOSE_FILE stop $SERVICE_NAME || true
+            docker compose -f $COMPOSE_FILE rm -f $SERVICE_NAME || true
+            
             docker stop $CONTAINER_NAME || true
-            docker rm $CONTAINER_NAME || true
+            docker rm -f $CONTAINER_NAME || true
 
-            docker-compose -f $COMPOSE_FILE pull $SERVICE_NAME
-            docker-compose -f $COMPOSE_FILE up -d $SERVICE_NAME
+            docker compose -f $COMPOSE_FILE pull $SERVICE_NAME
+            docker compose -f $COMPOSE_FILE up -d $SERVICE_NAME
 
-            # 헬스 체크 포트 결정
-            PORT=8080   # 기본값 
+            PORT=8080
             if [ "$SERVICE_NAME" = "eureka_server" ]; then
-            PORT=10481   # docker-compose 외부포트
+              PORT=10481
             elif [ "$SERVICE_NAME" = "config_server" ]; then
-            PORT=10482   # docker-compose 외부포트
+              PORT=10482
             elif [ "$SERVICE_NAME" = "gateway_server" ]; then
-            PORT=10485   # docker-compose 외부포트
+              PORT=10485
             fi
 
+            echo "🏥 헬스 체크 시작 (Target Port: $PORT)..."
             HEALTHY=false
-            for i in {1..10}; do
+            
+            # 최대 15번 시도 (75초 대기) - 게이트웨이는 뜨는 데 시간이 좀 걸릴 수 있음
+            for i in {1..15}; do
               STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:$PORT/actuator/health || echo "000")
+            
               if [ "$STATUS" == "200" ]; then
                 HEALTHY=true
+                echo "✅ [$i/15] 상태 정상 (200 OK)"
                 break
               fi
-              echo "⏳ 시도 $i: 아직 준비되지 않음 ($STATUS)"
+              echo "⏳ [$i/15] 대기 중... (응답코드: $STATUS)"
               sleep 5
             done
 
             if [ "$HEALTHY" != true ]; then
-              echo "❌ 배포 실패: 컨테이너가 정상 상태가 아닙니다."
+              echo "❌ 배포 실패: 헬스 체크 타임아웃"
+              echo "📋 최근 로그 출력:"
+              docker logs --tail 50 $CONTAINER_NAME
               exit 1
             fi
 
             docker image prune -f
-            echo "✅ ${{ inputs.service-name }} 배포 완료!"
+            echo "🎉 ${{ inputs.service-name }} 배포 완료!"
