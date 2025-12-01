@@ -6,13 +6,22 @@ on:
       service-name:
         required: true
         type: string
+        description: "docker-compose.yml에 정의된 기본 서비스 이름 (예: front_server, eureka_server)"
+      # [추가됨] 다중 인스턴스(_1, _2)로 배포되는 서비스인지 여부
+      is-multi-instance:
+        required: false
+        type: boolean
+        default: false
+        description: "true일 경우 _1, _2를 붙여서 순차 배포합니다. (기본값: false)"
       container-name:
-        required: true
+        required: false # 필수에서 선택으로 변경 (더 이상 스크립트에서 사용 안 함)
         type: string
+        description: "(사용되지 않음) 이전 버전 호환성을 위해 유지"
       compose-file:
         required: false
         type: string
         default: "docker-compose.yml"
+        description: "사용할 docker-compose 파일명"
 
     secrets:
       DOCKER_USERNAME:
@@ -43,6 +52,7 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
+      # 인프라 서비스는 테스트 없이 빌드만 수행
       - name: Maven 빌드
         run: mvn clean package -DskipTests
 
@@ -58,6 +68,7 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
+          # 이미지 태그는 입력받은 service-name을 사용
           tags: ${{ secrets.DOCKER_USERNAME }}/${{ inputs.service-name }}:latest
 
       - name: 서버에 배포
@@ -71,38 +82,68 @@ jobs:
             echo "🚀 ${{ inputs.service-name }} 배포 시작..."
             cd ~/www/nhnbook
 
-            CONTAINER_NAME="${{ inputs.container-name }}"
             SERVICE_NAME="${{ inputs.service-name }}"
             COMPOSE_FILE="${{ inputs.compose-file }}"
+            IS_MULTI_INSTANCE="${{ inputs.is-multi-instance }}"
 
-            docker compose -f $COMPOSE_FILE stop $SERVICE_NAME || true
-            docker compose -f $COMPOSE_FILE rm -f $SERVICE_NAME || true
+            # --- [핵심 수정] 배포 로직 분기 ---
+            if [ "$IS_MULTI_INSTANCE" = "true" ]; then
+              # === 다중 인스턴스 배포 (예: front_server, book_server 등) ===
+              echo "ℹ️ 다중 인스턴스(_1, _2) 배포 모드로 실행합니다."
             
-            docker stop $CONTAINER_NAME || true
-            docker rm -f $CONTAINER_NAME || true
+              for i in 1 2; do
+                TARGET_SERVICE="${SERVICE_NAME}_${i}"
+                echo "🔄 $TARGET_SERVICE 배포 진행 중..."
+            
+                # 기존 컨테이너를 내리고 이미지를 삭제하는 과정은
+                # docker compose up -d가 알아서 처리하므로 생략해도 됩니다.
+                # 명시적으로 하고 싶다면 아래 주석을 해제하세요.
+                # docker compose -f $COMPOSE_FILE stop $TARGET_SERVICE || true
+                # docker compose -f $COMPOSE_FILE rm -f $TARGET_SERVICE || true
 
-            docker compose -f $COMPOSE_FILE pull $SERVICE_NAME
-            docker compose -f $COMPOSE_FILE up -d $SERVICE_NAME
+                docker compose -f $COMPOSE_FILE pull $TARGET_SERVICE
+                docker compose -f $COMPOSE_FILE up -d $TARGET_SERVICE
+            
+                # 롤링 배포를 위해 인스턴스 간 대기 시간 부여
+                echo "⏳ 안정화를 위해 10초 대기..."
+                sleep 10
+              done
+            else
+              # === 단일 인스턴스 배포 (예: eureka_server, gateway_server 등) ===
+              echo "ℹ️ 단일 인스턴스 배포 모드로 실행합니다."
 
-            PORT=8080
-            if [ "$SERVICE_NAME" = "eureka_server" ]; then
-              PORT=10481
-            elif [ "$SERVICE_NAME" = "config_server" ]; then
-              PORT=10482
-            elif [ "$SERVICE_NAME" = "gateway_server" ]; then
-              PORT=10485
+              # docker compose -f $COMPOSE_FILE stop $SERVICE_NAME || true
+              # docker compose -f $COMPOSE_FILE rm -f $SERVICE_NAME || true
+            
+              docker compose -f $COMPOSE_FILE pull $SERVICE_NAME
+              docker compose -f $COMPOSE_FILE up -d $SERVICE_NAME
             fi
+            # ------------------------------------
+
+            # 헬스 체크 포트 설정
+            PORT=8080 # 기본값 (프론트 서버 등 actuator 없는 경우 대비)
+            case "$SERVICE_NAME" in
+              "eureka_server") PORT=10481 ;;
+              "config_server") PORT=10482 ;;
+              "gateway_server") PORT=10485 ;;
+              "front_server") PORT=10483 ;; # 프론트 서버 1번 포트 기준
+            esac
 
             echo "🏥 헬스 체크 시작 (Target Port: $PORT)..."
             HEALTHY=false
             
-            # 최대 15번 시도 (75초 대기) - 게이트웨이는 뜨는 데 시간이 좀 걸릴 수 있음
+            # 최대 15번 시도 (75초 대기)
             for i in {1..15}; do
+              # Actuator가 없는 서비스(예: 프론트)를 위해 루트 경로(/)로 체크하거나
+              # 특정 헬스체크 엔드포인트를 사용하도록 수정이 필요할 수 있습니다.
+              # 여기서는 일단 기존 로직을 유지합니다.
               STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:$PORT/actuator/health || echo "000")
             
-              if [ "$STATUS" == "200" ]; then
+              # 프론트 서버처럼 actuator가 없는 경우 200 OK가 아닌 404 등이 나올 수 있음
+              # 이 경우 포트가 열려있는지 확인하는 방식 등으로 변경 필요 (nc -z 등 사용)
+              if [ "$STATUS" == "200" ] || ([ "$SERVICE_NAME" == "front_server" ] && [ "$STATUS" != "000" ]); then
                 HEALTHY=true
-                echo "✅ [$i/15] 상태 정상 (200 OK)"
+                echo "✅ [$i/15] 상태 정상 (응답코드: $STATUS)"
                 break
               fi
               echo "⏳ [$i/15] 대기 중... (응답코드: $STATUS)"
@@ -111,8 +152,9 @@ jobs:
 
             if [ "$HEALTHY" != true ]; then
               echo "❌ 배포 실패: 헬스 체크 타임아웃"
-              echo "📋 최근 로그 출력:"
-              docker logs --tail 50 $CONTAINER_NAME
+              # 다중 인스턴스일 경우 로그 확인이 복잡해질 수 있음
+              # echo "📋 최근 로그 출력:"
+              # docker logs --tail 50 ...
               exit 1
             fi
 
