@@ -51,8 +51,8 @@ jobs:
 
       # 3. Maven 빌드 + SonarQube 분석
       - name: Maven 빌드 및 SonarQube 분석
-        run: mvn clean package sonar:sonar -Dsonar.projectKey=${{ inputs.project-key }} -Dsonar.host.url=http://s4.java21.net:9000 -Dsonar.login=${{ secrets.SONAR_TOKEN }} -Dsonar.qualitygate.wait=true ${{ inputs.maven-args }}
-
+      # 기존 명령어 끝부분에 -Dsonar.branch.name 옵션을 추가합니다.
+        run: mvn clean package sonar:sonar -Dsonar.projectKey=${{ inputs.project-key }} -Dsonar.host.url=http://s4.java21.net:9000 -Dsonar.login=${{ secrets.SONAR_TOKEN }} -Dsonar.qualitygate.wait=true -Dsonar.branch.name=${{ github.ref_name }} ${{ inputs.maven-args }}
       # 4. Docker Hub 로그인
       - name: Docker Hub 로그인
         uses: docker/login-action@v3
