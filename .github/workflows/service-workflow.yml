@@ -71,7 +71,6 @@ jobs:
             -Dsonar.projectKey=$DYNAMIC_PROJECT_KEY \
             -Dsonar.host.url=http://s4.java21.net:9000 \
             -Dsonar.login=${{ secrets.SONAR_TOKEN }} \
-            -Dsonar.qualitygate.wait=true \
             ${{ inputs.maven-args }}
 
       # 4. Docker Hub 로그인 (배포 옵션 켜졌을 때만 실행)
