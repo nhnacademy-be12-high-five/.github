@@ -6,21 +6,35 @@ on:
       project-key:
         required: true
         type: string
+        description: "SonarQube 프로젝트 키"
       docker-image:
         required: true
         type: string
+        description: "Docker Hub 이미지 이름 (예: fbxogns123/member-server)"
       container-name:
         required: true
         type: string
+        description: "docker-compose 서비스 기본 이름 (예: member-server)"
       maven-args:
         required: false
         type: string
         default: ""
-      # [추가됨] 배포 실행 여부 (기본값: true -> 기존 서비스 영향 없음)
+        description: "Maven 빌드 옵션"
+
+      # [기존] 배포 실행 여부
       deploy-enabled:
         required: false
         type: boolean
         default: true
+        description: "false일 경우 빌드와 분석만 수행하고 배포는 건너뜁니다."
+
+      # [추가됨] 다중 인스턴스 배포 여부 (기본값: false)
+      is-multi-instance:
+        required: false
+        type: boolean
+        default: false
+        description: "true일 경우 서비스명 뒤에 -1, -2를 붙여서 순차 배포합니다."
+
     secrets:
       SONAR_TOKEN:
         required: true
@@ -42,11 +56,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. 코드 체크아웃 (항상 실행)
+      # 1. 코드 체크아웃
       - name: 코드 체크아웃
         uses: actions/checkout@v4
 
-      # 2. JDK 설정 (항상 실행)
+      # 2. JDK 설정
       - name: JDK 21 설정
         uses: actions/setup-java@v4
         with:
@@ -54,7 +68,7 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      # 3. Maven 빌드 + SonarQube 분석 (항상 실행)
+      # 3. Maven 빌드 + SonarQube 분석
       - name: Maven 빌드 및 SonarQube 분석
         run: |
           if [ "${{ github.ref_name }}" == "main" ]; then
@@ -73,7 +87,7 @@ jobs:
             -Dsonar.login=${{ secrets.SONAR_TOKEN }} \
             ${{ inputs.maven-args }}
 
-      # 4. Docker Hub 로그인 (배포 옵션 켜졌을 때만 실행)
+      # 4. Docker Hub 로그인 (deploy-enabled가 true일 때만 실행)
       - name: Docker Hub 로그인
         if: ${{ inputs.deploy-enabled }}
         uses: docker/login-action@v3
@@ -81,7 +95,7 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      # 5. Docker 이미지 빌드 및 푸시 (배포 옵션 켜졌을 때만 실행)
+      # 5. Docker 이미지 빌드 및 푸시 (deploy-enabled가 true일 때만 실행)
       - name: Docker 이미지 빌드 및 푸시
         if: ${{ inputs.deploy-enabled }}
         uses: docker/build-push-action@v5
@@ -91,8 +105,8 @@ jobs:
           push: true
           tags: ${{ inputs.docker-image }}:latest
 
-      # 6. 서버 접속 및 배포 (배포 옵션 켜졌을 때만 실행)
-      - name: 서버 배포 (SSH, Rolling)
+      # 6. 서버 접속 및 배포 (deploy-enabled가 true일 때만 실행)
+      - name: 서버 배포 (SSH)
         if: ${{ inputs.deploy-enabled }}
         uses: appleboy/ssh-action@master
         with:
@@ -101,27 +115,39 @@ jobs:
           password: ${{ secrets.SSH_PW }}
           port: ${{ secrets.SSH_PORT }}
           script: |
-            echo "🚀 ${{ inputs.container-name }} 서비스 배포 시작 (Rolling Update)..."
+            echo "🚀 ${{ inputs.container-name }} 서비스 배포 시작..."
             cd ~/www/nhnbook
 
             SERVICE_BASE="${{ inputs.container-name }}"
+            IS_MULTI="${{ inputs.is-multi-instance }}"
 
-            for INSTANCE in 1 2; do
-              CONTAINER_NAME="${SERVICE_BASE}_${INSTANCE}"
-              echo "🔄 $CONTAINER_NAME 컨테이너 업데이트 중..."
-
-              # 최신 이미지를 pull 받고 컨테이너를 재생성합니다.
-              docker compose pull $CONTAINER_NAME
-              docker compose up -d $CONTAINER_NAME
+            # --- 배포 로직 분기 ---
+            if [ "$IS_MULTI" == "true" ]; then
+              echo "ℹ️ 다중 인스턴스(-1, -2) 순차 배포 모드입니다."
             
-              # (선택사항) 새 컨테이너가 뜨는 시간을 잠깐 기다려줍니다.
-              sleep 5
-            done
+              for i in 1 2; do
+                # 주의: docker-compose 서비스 이름 규칙에 맞춰 하이픈(-) 사용
+                TARGET_SERVICE="${SERVICE_BASE}-${i}"
+            
+                echo "🔄 $TARGET_SERVICE 업데이트 중..."
+                docker compose pull $TARGET_SERVICE
+                docker compose up -d $TARGET_SERVICE
+            
+                echo "⏳ 안정화를 위해 5초 대기..."
+                sleep 5
+              done
+            else
+              echo "ℹ️ 단일 인스턴스 배포 모드입니다."
+              echo "🔄 $SERVICE_BASE 업데이트 중..."
+              docker compose pull $SERVICE_BASE
+              docker compose up -d $SERVICE_BASE
+            fi
+            # ---------------------
 
-            # 게이트웨이 헬스체크를 통해 전체 서비스 정상 가동 확인
+            # 게이트웨이 헬스체크 (서비스가 올라온 후 정상 응답하는지 확인)
             echo "🏥 전체 서비스 헬스체크 시작 (Gateway)..."
             HEALTHY=false
-            for i in {1..12}; do # 약 1분간 대기 (5초 * 12회)
+            for i in {1..12}; do
               STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:10485/actuator/health || echo "000")
               if [ "$STATUS" == "200" ]; then
                 HEALTHY=true
