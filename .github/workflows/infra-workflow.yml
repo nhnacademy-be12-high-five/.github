@@ -125,8 +125,8 @@ jobs:
             case "$SERVICE_NAME" in
               "eureka_server") PORT=10481 ;;
               "config_server") PORT=10482 ;;
-              "gateway_server") PORT=10485 ;;
-              "front_server") PORT=10483 ;; # 프론트 서버 1번 포트 기준
+              "gateway-server") PORT=10485 ;;
+              "front-server") PORT=10483 ;; # 프론트 서버 1번 포트 기준
             esac
 
             echo "🏥 헬스 체크 시작 (Target Port: $PORT)..."
