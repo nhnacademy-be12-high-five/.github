@@ -78,23 +78,6 @@ jobs:
           username: ${{ secrets.SSH_ID }}
           password: ${{ secrets.SSH_PW }}
           port: ${{ secrets.SSH_PORT }}
-          네, 정확합니다! 제가 서비스 이름(Service Name)과 컨테이너 이름(Container Name)을 혼동했습니다.
-
-          로그를 보니 inputs.service-name으로 team5-gateway-server (컨테이너 이름)가 들어오고 있습니다. 하지만 docker-compose.yml 파일 안에는 서비스 키(Key)가 gateway-server (접두사 team5- 없음)로 정의되어 있습니다.
-
-          그래서 docker compose up team5-gateway-server를 실행하니 "no such service" (그런 서비스 없다)라고 에러가 나는 것이고, case 문에서도 team5-가 붙은 이름을 처리하는 로직이 없어서 포트가 기본값(8080)으로 빠져버린 것입니다.
-
-          해결책:
-
-          Docker 명령용 이름: 입력받은 이름에서 team5-를 제거하여 docker-compose.yml의 서비스 키와 일치시킵니다.
-
-          포트 확인용 이름: 입력받은 이름(team5-...)을 그대로 case문에 추가하여 포트를 정확히 잡습니다.
-
-          아래 스크립트로 덮어씌우면 100% 해결됩니다.
-
-          최종 수정된 deploy.yml (Script 부분)
-          YAML
-
           script: |
             echo "🚀 ${{ inputs.service-name }} 배포 시작..."
             cd ~/www/nhnbook
