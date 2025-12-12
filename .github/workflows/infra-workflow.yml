@@ -107,14 +107,14 @@ jobs:
             
                 echo "🔄 $TARGET 배포 중..."
                 docker compose -f $COMPOSE_FILE pull $TARGET
-                docker compose -f $COMPOSE_FILE up -d $TARGET
+                docker compose -f $COMPOSE_FILE up -d --force-recreate $TARGET
                 sleep 10
               done
             else
               echo "ℹ️ 단일 인스턴스 배포 모드"
               # team5-gateway-server -> gateway-server 로 명령 실행
               docker compose -f $COMPOSE_FILE pull $SERVICE_KEY
-              docker compose -f $COMPOSE_FILE up -d $SERVICE_KEY
+              docker compose -f $COMPOSE_FILE up -d --force-recreate $SERVICE_KEY
             fi
             
             # -----------------------------------------------------------
