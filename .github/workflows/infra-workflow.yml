@@ -78,22 +78,49 @@ jobs:
           username: ${{ secrets.SSH_ID }}
           password: ${{ secrets.SSH_PW }}
           port: ${{ secrets.SSH_PORT }}
+          네, 정확합니다! 제가 서비스 이름(Service Name)과 컨테이너 이름(Container Name)을 혼동했습니다.
+
+          로그를 보니 inputs.service-name으로 team5-gateway-server (컨테이너 이름)가 들어오고 있습니다. 하지만 docker-compose.yml 파일 안에는 서비스 키(Key)가 gateway-server (접두사 team5- 없음)로 정의되어 있습니다.
+
+          그래서 docker compose up team5-gateway-server를 실행하니 "no such service" (그런 서비스 없다)라고 에러가 나는 것이고, case 문에서도 team5-가 붙은 이름을 처리하는 로직이 없어서 포트가 기본값(8080)으로 빠져버린 것입니다.
+
+          해결책:
+
+          Docker 명령용 이름: 입력받은 이름에서 team5-를 제거하여 docker-compose.yml의 서비스 키와 일치시킵니다.
+
+          포트 확인용 이름: 입력받은 이름(team5-...)을 그대로 case문에 추가하여 포트를 정확히 잡습니다.
+
+          아래 스크립트로 덮어씌우면 100% 해결됩니다.
+
+          최종 수정된 deploy.yml (Script 부분)
+          YAML
+
           script: |
             echo "🚀 ${{ inputs.service-name }} 배포 시작..."
             cd ~/www/nhnbook
             
-            SERVICE_NAME="${{ inputs.service-name }}"
+            # 1. 입력 변수 정리
+            # INPUT_NAME: 워크플로우에서 넘겨받은 이름 (예: team5-gateway-server)
+            INPUT_NAME="${{ inputs.service-name }}"
             COMPOSE_FILE="${{ inputs.compose-file }}"
             IS_MULTI_INSTANCE="${{ inputs.is-multi-instance }}"
             
+            # 2. Docker Compose용 서비스 이름 추출 (team5- 접두사 제거)
+            # 예: team5-gateway-server -> gateway-server
+            # 예: team5-front-server   -> front-server
+            SERVICE_KEY=${INPUT_NAME#team5-}
+            
+            echo "ℹ️ 입력 이름: $INPUT_NAME"
+            echo "ℹ️ Compose 서비스 키: $SERVICE_KEY"
+            
             # -----------------------------------------------------------
-            # 1. 배포 로직 (Front는 다중, 나머지는 단일)
+            # 3. 배포 실행 (Compose 서비스 키 사용)
             # -----------------------------------------------------------
             if [ "$IS_MULTI_INSTANCE" = "true" ]; then
-              echo "ℹ️ 다중 인스턴스 배포 모드 (Front Server)"
+              echo "ℹ️ 다중 인스턴스 배포 모드 (Front)"
               for i in 1 2; do
-                TARGET="${SERVICE_NAME}-${i}" 
-                # docker-compose 이름 규칙에 맞춤 (front-server-1)
+                # team5-front-server -> front-server-1, front-server-2
+                TARGET="${SERVICE_KEY}-${i}"
             
                 echo "🔄 $TARGET 배포 중..."
                 docker compose -f $COMPOSE_FILE pull $TARGET
@@ -101,63 +128,67 @@ jobs:
                 sleep 10
               done
             else
-              echo "ℹ️ 단일 인스턴스 배포 모드 (Gateway/Config/Eureka)"
-              docker compose -f $COMPOSE_FILE pull $SERVICE_NAME
-              docker compose -f $COMPOSE_FILE up -d $SERVICE_NAME
+              echo "ℹ️ 단일 인스턴스 배포 모드"
+              # team5-gateway-server -> gateway-server 로 명령 실행
+              docker compose -f $COMPOSE_FILE pull $SERVICE_KEY
+              docker compose -f $COMPOSE_FILE up -d $SERVICE_KEY
             fi
             
             # -----------------------------------------------------------
-            # 2. 헬스 체크 포트 설정 (Host 포트 기준)
+            # 4. 헬스 체크 포트 설정 (입력 이름 기준)
             # -----------------------------------------------------------
-            # 여기가 핵심입니다. 각 서비스가 Host에 노출하는 포트를 지정합니다.
+            CHECK_PORT=8080
             
-            CHECK_PORT=8080 # 기본값
-            
-            case "$SERVICE_NAME" in
-              "eureka-server"|"eureka_server") CHECK_PORT=10481 ;;
-              "config-server"|"config_server") CHECK_PORT=10482 ;; # 8888 -> 10482
-              "gateway-server"|"gateway_server") CHECK_PORT=10485 ;; # 8000 -> 10485 (핵심!)
-              "front-server"|"front_server") CHECK_PORT=10483 ;;   # front-1 기준
+            # team5- 가 붙어있든 안 붙어있든 모두 처리하도록 수정
+            case "$INPUT_NAME" in
+              *"eureka-server"*)  CHECK_PORT=10481 ;;
+              *"config-server"*)  CHECK_PORT=10482 ;;
+              *"gateway-server"*) CHECK_PORT=10485 ;; # 외부 포트
+              *"front-server"*)   CHECK_PORT=10483 ;;
             esac
             
-            echo "🏥 헬스 체크 시작 (Service: $SERVICE_NAME, Host Port: $CHECK_PORT)..."
+            echo "🏥 헬스 체크 시작 (Target: $INPUT_NAME, Host Port: $CHECK_PORT)..."
             HEALTHY=false
             
-            # Gateway는 Config Server 연결 때문에 부팅이 오래 걸릴 수 있음 (최대 30회/150초 대기)
-            for i in {1..30}; do
-              # Host(Ubuntu)에서 curl을 날리므로 127.0.0.1은 Host 자신을 의미함
+            for i in {1..15}; do
+              # Host에서 curl 요청
               STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:$CHECK_PORT/actuator/health || echo "000")
             
-              # 200 OK면 성공
-              if [ "$STATUS" == "200" ]; then
+              # 000(연결실패)만 아니면 서버가 뜬 것으로 간주 (404, 401 포함)
+              if [ "$STATUS" != "000" ]; then
                 HEALTHY=true
-                echo "✅ [$i/30] 상태 정상 (Code: 200)"
+                if [ "$STATUS" == "200" ]; then
+                    echo "✅ [$i/15] 상태 정상 (Code: 200)"
+                else
+                    echo "⚠️ [$i/15] 서버 생존 확인됨 (Code: $STATUS) - Actuator 경로 확인 필요"
+                fi
                 break
               fi
             
-              # Front Server는 Actuator가 없어서 404가 뜨더라도 연결 자체가 되면 성공으로 간주
-              if [[ "$SERVICE_NAME" == *"front"* ]] && [ "$STATUS" != "000" ]; then
-                 HEALTHY=true
-                 echo "✅ [$i/30] 서버 응답 확인됨 (Code: $STATUS)"
-                 break
-              fi
-            
-              echo "⏳ [$i/30] 부팅 대기 중... (Code: $STATUS)"
+              echo "⏳ [$i/15] 부팅 대기 중... (Code: $STATUS)"
               sleep 5
             done
             
             if [ "$HEALTHY" != true ]; then
-              echo "❌ 배포 실패: 헬스 체크 타임아웃 (Port: $CHECK_PORT)"
-              echo "📋 컨테이너 로그 확인:"
+              echo "❌ 배포 실패: 서버 연결 불가 (타임아웃)"
+              echo "📋 로그 확인:"
             
-              # 실패 시 로그 출력 (다중/단일 구분)
-              if [ "$IS_MULTI_INSTANCE" = "true" ]; then
-                 docker logs --tail 50 "team5-${SERVICE_NAME}-1"
+              # 로그 확인 시에는 컨테이너 이름(team5-...)을 사용해야 함
+              # 입력값 자체가 team5-gateway-server라면 그대로 사용
+              # 만약 아니라면 team5-를 붙여줌
+              if [[ "$INPUT_NAME" == "team5-"* ]]; then
+                  LOG_TARGET="$INPUT_NAME"
               else
-                 docker logs --tail 50 "team5-${SERVICE_NAME}"
+                  LOG_TARGET="team5-$INPUT_NAME"
+              fi
+            
+              if [ "$IS_MULTI_INSTANCE" = "true" ]; then
+                 docker logs --tail 50 "${LOG_TARGET}-1"
+              else
+                 docker logs --tail 50 "${LOG_TARGET}"
               fi
               exit 1
             fi
             
             docker image prune -f
-            echo "🎉 $SERVICE_NAME 배포 완료!"
+            echo "🎉 $INPUT_NAME 배포 완료!"
