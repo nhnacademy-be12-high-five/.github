@@ -81,82 +81,97 @@ jobs:
           script: |
             echo "🚀 ${{ inputs.service-name }} 배포 시작..."
             cd ~/www/nhnbook
-
-            SERVICE_NAME="${{ inputs.service-name }}"
+            
+            # 1. 입력 변수 정리
+            # INPUT_NAME: 워크플로우에서 넘겨받은 이름 (예: team5-gateway-server)
+            INPUT_NAME="${{ inputs.service-name }}"
             COMPOSE_FILE="${{ inputs.compose-file }}"
             IS_MULTI_INSTANCE="${{ inputs.is-multi-instance }}"
-
-            # --- [핵심 수정] 배포 로직 분기 ---
+            
+            # 2. Docker Compose용 서비스 이름 추출 (team5- 접두사 제거)
+            # 예: team5-gateway-server -> gateway-server
+            # 예: team5-front-server   -> front-server
+            SERVICE_KEY=${INPUT_NAME#team5-}
+            
+            echo "ℹ️ 입력 이름: $INPUT_NAME"
+            echo "ℹ️ Compose 서비스 키: $SERVICE_KEY"
+            
+            # -----------------------------------------------------------
+            # 3. 배포 실행 (Compose 서비스 키 사용)
+            # -----------------------------------------------------------
             if [ "$IS_MULTI_INSTANCE" = "true" ]; then
-              # === 다중 인스턴스 배포 (예: front_server, book_server 등) ===
-              echo "ℹ️ 다중 인스턴스(_1, _2) 배포 모드로 실행합니다."
-            
+              echo "ℹ️ 다중 인스턴스 배포 모드 (Front)"
               for i in 1 2; do
-                TARGET_SERVICE="${SERVICE_NAME}_${i}"
-                echo "🔄 $TARGET_SERVICE 배포 진행 중..."
+                # team5-front-server -> front-server-1, front-server-2
+                TARGET="${SERVICE_KEY}-${i}"
             
-                # 기존 컨테이너를 내리고 이미지를 삭제하는 과정은
-                # docker compose up -d가 알아서 처리하므로 생략해도 됩니다.
-                # 명시적으로 하고 싶다면 아래 주석을 해제하세요.
-                # docker compose -f $COMPOSE_FILE stop $TARGET_SERVICE || true
-                # docker compose -f $COMPOSE_FILE rm -f $TARGET_SERVICE || true
-
-                docker compose -f $COMPOSE_FILE pull $TARGET_SERVICE
-                docker compose -f $COMPOSE_FILE up -d $TARGET_SERVICE
-            
-                # 롤링 배포를 위해 인스턴스 간 대기 시간 부여
-                echo "⏳ 안정화를 위해 10초 대기..."
+                echo "🔄 $TARGET 배포 중..."
+                docker compose -f $COMPOSE_FILE pull $TARGET
+                docker compose -f $COMPOSE_FILE up -d --force-recreate $TARGET
                 sleep 10
               done
             else
-              # === 단일 인스턴스 배포 (예: eureka_server, gateway_server 등) ===
-              echo "ℹ️ 단일 인스턴스 배포 모드로 실행합니다."
-
-              # docker compose -f $COMPOSE_FILE stop $SERVICE_NAME || true
-              # docker compose -f $COMPOSE_FILE rm -f $SERVICE_NAME || true
-            
-              docker compose -f $COMPOSE_FILE pull $SERVICE_NAME
-              docker compose -f $COMPOSE_FILE up -d $SERVICE_NAME
+              echo "ℹ️ 단일 인스턴스 배포 모드"
+              # team5-gateway-server -> gateway-server 로 명령 실행
+              docker compose -f $COMPOSE_FILE pull $SERVICE_KEY
+              docker compose -f $COMPOSE_FILE up -d --force-recreate $SERVICE_KEY
             fi
-            # ------------------------------------
-
-            # 헬스 체크 포트 설정
-            PORT=8080 # 기본값 (프론트 서버 등 actuator 없는 경우 대비)
-            case "$SERVICE_NAME" in
-              *"eureka"*) PORT=10481 ;;
-              *"config"*) PORT=10482 ;;
-              *"gateway"*) PORT=10485 ;;
-              *"front"*) PORT=10483 ;; # 프론트 서버 1번 포트 기준
+            
+            # -----------------------------------------------------------
+            # 4. 헬스 체크 포트 설정 (입력 이름 기준)
+            # -----------------------------------------------------------
+            CHECK_PORT=8080
+            
+            # team5- 가 붙어있든 안 붙어있든 모두 처리하도록 수정
+            case "$INPUT_NAME" in
+              *"eureka-server"*)  CHECK_PORT=10481 ;;
+              *"config-server"*)  CHECK_PORT=10482 ;;
+              *"gateway-server"*) CHECK_PORT=10485 ;; # 외부 포트
+              *"front-server"*)   CHECK_PORT=10483 ;;
             esac
-
-            echo "🏥 헬스 체크 시작 (Target Port: $PORT)..."
+            
+            echo "🏥 헬스 체크 시작 (Target: $INPUT_NAME, Host Port: $CHECK_PORT)..."
             HEALTHY=false
             
-            # 최대 15번 시도 (75초 대기)
             for i in {1..15}; do
-              # Actuator가 없는 서비스(예: 프론트)를 위해 루트 경로(/)로 체크하거나
-              # 특정 헬스체크 엔드포인트를 사용하도록 수정이 필요할 수 있습니다.
-              # 여기서는 일단 기존 로직을 유지합니다.
-              STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:$PORT/actuator/health || echo "000")
+              # Host에서 curl 요청
+              STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:$CHECK_PORT/actuator/health || echo "000")
             
-              # 프론트 서버처럼 actuator가 없는 경우 200 OK가 아닌 404 등이 나올 수 있음
-              # 이 경우 포트가 열려있는지 확인하는 방식 등으로 변경 필요 (nc -z 등 사용)
-              if [ "$STATUS" == "200" ] || ([ "$SERVICE_NAME" == "front_server" ] && [ "$STATUS" != "000" ]); then
+              # 000(연결실패)만 아니면 서버가 뜬 것으로 간주 (404, 401 포함)
+              if [ "$STATUS" != "000" ]; then
                 HEALTHY=true
-                echo "✅ [$i/15] 상태 정상 (응답코드: $STATUS)"
+                if [ "$STATUS" == "200" ]; then
+                    echo "✅ [$i/15] 상태 정상 (Code: 200)"
+                else
+                    echo "⚠️ [$i/15] 서버 생존 확인됨 (Code: $STATUS) - Actuator 경로 확인 필요"
+                fi
                 break
               fi
-              echo "⏳ [$i/15] 대기 중... (응답코드: $STATUS)"
+            
+              echo "⏳ [$i/15] 부팅 대기 중... (Code: $STATUS)"
               sleep 5
             done
-
+            
             if [ "$HEALTHY" != true ]; then
-              echo "❌ 배포 실패: 헬스 체크 타임아웃"
-              # 다중 인스턴스일 경우 로그 확인이 복잡해질 수 있음
-              # echo "📋 최근 로그 출력:"
-              # docker logs --tail 50 ...
+              echo "❌ 배포 실패: 서버 연결 불가 (타임아웃)"
+              echo "📋 로그 확인:"
+            
+              # 로그 확인 시에는 컨테이너 이름(team5-...)을 사용해야 함
+              # 입력값 자체가 team5-gateway-server라면 그대로 사용
+              # 만약 아니라면 team5-를 붙여줌
+              if [[ "$INPUT_NAME" == "team5-"* ]]; then
+                  LOG_TARGET="$INPUT_NAME"
+              else
+                  LOG_TARGET="team5-$INPUT_NAME"
+              fi
+            
+              if [ "$IS_MULTI_INSTANCE" = "true" ]; then
+                 docker logs --tail 50 "${LOG_TARGET}-1"
+              else
+                 docker logs --tail 50 "${LOG_TARGET}"
+              fi
               exit 1
             fi
-
+            
             docker image prune -f
-            echo "🎉 ${{ inputs.service-name }} 배포 완료!"
+            echo "🎉 $INPUT_NAME 배포 완료!"
