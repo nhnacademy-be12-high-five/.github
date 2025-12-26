@@ -123,10 +123,10 @@ jobs:
             # 헬스 체크 포트 설정
             PORT=8080 # 기본값 (프론트 서버 등 actuator 없는 경우 대비)
             case "$SERVICE_NAME" in
-              "eureka_server") PORT=10481 ;;
-              "config_server") PORT=10482 ;;
-              "gateway_server") PORT=10485 ;;
-              "front_server") PORT=10483 ;; # 프론트 서버 1번 포트 기준
+              *"eureka"*) PORT=10481 ;;
+              *"config"*) PORT=10482 ;;
+              *"gateway"*) PORT=10485 ;;
+              *"front"*) PORT=10483 ;; # 프론트 서버 1번 포트 기준
             esac
 
             echo "🏥 헬스 체크 시작 (Target Port: $PORT)..."
