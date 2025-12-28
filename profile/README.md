@@ -49,6 +49,9 @@
   </tbody>
 </table>
 
+<h2>API 명세서</h2>
+<a href="https://nhnbook.shop/swagger-ui.html" target="_blank">nhnbook.shop swagger-ui</a>
+
 <h4>주요기능</h4>
 
 <!-- // Key Features (주요 기능)  -->
