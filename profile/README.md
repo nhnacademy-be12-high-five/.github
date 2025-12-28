@@ -74,3 +74,10 @@
   <img src="https://img.shields.io/badge/nginx-%23009639.svg?style=for-the-badge&logo=nginx&logoColor=white">
   <img src="https://img.shields.io/badge/Redis-DC382D?style=for-the-badge&logo=Redis&logoColor=white"> 
 </div>
+
+<h4>시스템 아키텍쳐</h4>
+<img width="1345" height="463" alt="스크린샷 2025-12-28 오후 2 33 36" src="https://github.com/user-attachments/assets/803c80c4-080e-4c24-a1cf-726d77d2b000" />
+<h4>CI/CD</h4>
+<img width="1368" height="478" alt="스크린샷 2025-12-28 오후 2 34 00" src="https://github.com/user-attachments/assets/f6458521-b608-47b3-aeac-7c6095aa1b04" />
+</div>
+
