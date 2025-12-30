@@ -71,20 +71,40 @@ jobs:
       # 3. Maven 빌드 + SonarQube 분석
       - name: Maven 빌드 및 SonarQube 분석
         run: |
-          if [ "${{ github.ref_name }}" == "main" ]; then
-            DYNAMIC_PROJECT_KEY="${{ inputs.project-key }}"
+          # 1. 입력받은 서비스 이름 가져오기
+          SERVICE_NAME="${{ inputs.container-name }}"
+          
+          # 2. 프로젝트명 조립 (team5- 접두사 붙이기)
+          # 만약 SERVICE_NAME이 'member'라면 'team5-member-server'가 됩니다.
+          # 만약 SERVICE_NAME이 'member-server'라면 'team5-member-server'가 됩니다.
+          if [[ "$SERVICE_NAME" == *"-server" ]]; then
+            # 이미 -server가 포함된 경우
+            BASE_NAME="team5-$SERVICE_NAME"
           else
-            SAFE_BRANCH_NAME=$(echo "${{ github.ref_name }}" | sed 's/\//-/g')
-            DYNAMIC_PROJECT_KEY="${{ inputs.project-key }}-$SAFE_BRANCH_NAME"
+            # -server가 없는 경우 붙여줌
+            BASE_NAME="team5-$SERVICE_NAME-server"
           fi
 
-          echo "ℹ️ [정보] 현재 브랜치: ${{ github.ref_name }}"
-          echo "ℹ️ [정보] SonarQube Project Key: $DYNAMIC_PROJECT_KEY 로 분석을 시작합니다."
+          # 3. 브랜치에 따른 Key/Name 분기
+          SAFE_BRANCH_NAME=$(echo "${{ github.ref_name }}" | sed 's/\//-/g')
+          
+          if [ "${{ github.ref_name }}" == "main" ]; then
+            DYNAMIC_PROJECT_KEY="${{ inputs.project-key }}"
+            DYNAMIC_PROJECT_NAME="$BASE_NAME"
+          else
+            DYNAMIC_PROJECT_KEY="${{ inputs.project-key }}-$SAFE_BRANCH_NAME"
+            DYNAMIC_PROJECT_NAME="$BASE_NAME [$SAFE_BRANCH_NAME]"
+          fi
 
-          mvn clean package sonar:sonar \
+          echo "ℹ️ [정보] SonarQube Key: $DYNAMIC_PROJECT_KEY"
+          echo "ℹ️ [정보] 생성될 프로젝트 명: $DYNAMIC_PROJECT_NAME"
+
+          mvn clean verify sonar:sonar \
             -Dsonar.projectKey=$DYNAMIC_PROJECT_KEY \
+            -Dsonar.projectName="$DYNAMIC_PROJECT_NAME" \
             -Dsonar.host.url=http://s4.java21.net:9000 \
             -Dsonar.login=${{ secrets.SONAR_TOKEN }} \
+            -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml \
             ${{ inputs.maven-args }}
 
       # 4. Docker Hub 로그인 (deploy-enabled가 true일 때만 실행)
