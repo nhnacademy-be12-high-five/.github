@@ -6,7 +6,7 @@ on:
       project-key:
         required: true
         type: string
-        description: "SonarQube 프로젝트 키"
+        description: "SonarQube 프로젝트 키 (기본값)"
       docker-image:
         required: true
         type: string
@@ -19,16 +19,16 @@ on:
         required: false
         type: string
         default: ""
-        description: "Maven 빌드 옵션"
+        description: "Maven 빌드 추가 옵션"
 
-      # [기존] 배포 실행 여부
+      # 배포 실행 여부
       deploy-enabled:
         required: false
         type: boolean
         default: true
-        description: "false일 경우 빌드와 분석만 수행하고 배포는 건너뜁니다."
+        description: "false일 경우 빌드와 테스트만 수행하고 배포는 건너뜁니다."
 
-      # [추가됨] 다중 인스턴스 배포 여부 (기본값: false)
+      # 다중 인스턴스 배포 여부
       is-multi-instance:
         required: false
         type: boolean
@@ -56,11 +56,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. 코드 체크아웃
+      # 1. 코드 체크아웃 (전체 히스토리 가져오기)
       - name: 코드 체크아웃
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # SonarQube 정확도를 위해 전체 이력 필요
 
-      # 2. JDK 설정
+      # 2. JDK 21 설정
       - name: JDK 21 설정
         uses: actions/setup-java@v4
         with:
@@ -68,26 +70,67 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      # 3. Maven 빌드 + SonarQube 분석
+      # 3. Maven 빌드 및 SonarQube 분석 (분기 처리 적용)
       - name: Maven 빌드 및 SonarQube 분석
         run: |
-          if [ "${{ github.ref_name }}" == "main" ]; then
-            DYNAMIC_PROJECT_KEY="${{ inputs.project-key }}"
+          # -----------------------------------------------------------
+          # 1. 프로젝트 이름 규칙 설정 (team5- 접두사 및 -server 접미사 보정)
+          # -----------------------------------------------------------
+          SERVICE_NAME="${{ inputs.container-name }}"
+          
+          if [[ "$SERVICE_NAME" == *"-server" ]]; then
+            # 이미 -server가 포함된 경우 (예: member-server -> team5-member-server)
+            BASE_NAME="team5-$SERVICE_NAME"
           else
-            SAFE_BRANCH_NAME=$(echo "${{ github.ref_name }}" | sed 's/\//-/g')
-            DYNAMIC_PROJECT_KEY="${{ inputs.project-key }}-$SAFE_BRANCH_NAME"
+            # -server가 없는 경우 (예: member -> team5-member-server)
+            BASE_NAME="team5-$SERVICE_NAME-server"
           fi
 
-          echo "ℹ️ [정보] 현재 브랜치: ${{ github.ref_name }}"
-          echo "ℹ️ [정보] SonarQube Project Key: $DYNAMIC_PROJECT_KEY 로 분석을 시작합니다."
+          # -----------------------------------------------------------
+          # 2. 브랜치별 분석 로직 분기
+          # -----------------------------------------------------------
+          CURRENT_BRANCH="${{ github.ref_name }}"
+          echo "ℹ️ 현재 브랜치: $CURRENT_BRANCH"
 
-          mvn clean package sonar:sonar \
-            -Dsonar.projectKey=$DYNAMIC_PROJECT_KEY \
-            -Dsonar.host.url=http://s4.java21.net:9000 \
-            -Dsonar.login=${{ secrets.SONAR_TOKEN }} \
-            ${{ inputs.maven-args }}
+          if [[ "$CURRENT_BRANCH" == "main" ]] || [[ "$CURRENT_BRANCH" == "dev" ]]; then
+          
+            echo "🚀 [SonarQube] Main/Dev 브랜치 감지됨. 정적 분석 및 커버리지 측정을 시작합니다."
 
-      # 4. Docker Hub 로그인 (deploy-enabled가 true일 때만 실행)
+            # 브랜치에 따른 키/이름 설정
+            if [ "$CURRENT_BRANCH" == "main" ]; then
+              DYNAMIC_PROJECT_KEY="${{ inputs.project-key }}"
+              DYNAMIC_PROJECT_NAME="$BASE_NAME"
+            else
+              # dev 브랜치: 슬래시(/)를 하이픈(-)으로 변경
+              SAFE_BRANCH_NAME=$(echo "$CURRENT_BRANCH" | sed 's/\//-/g')
+              DYNAMIC_PROJECT_KEY="${{ inputs.project-key }}-$SAFE_BRANCH_NAME"
+              DYNAMIC_PROJECT_NAME="$BASE_NAME [$SAFE_BRANCH_NAME]"
+            fi
+
+            echo "ℹ️ [설정] Key: $DYNAMIC_PROJECT_KEY"
+            echo "ℹ️ [설정] Name: $DYNAMIC_PROJECT_NAME"
+
+            # verify: 테스트 수행 및 JaCoCo 리포트 생성
+            # sonar:sonar: 분석 결과 전송
+            mvn clean verify sonar:sonar \
+              -Dsonar.projectKey=$DYNAMIC_PROJECT_KEY \
+              -Dsonar.projectName="$DYNAMIC_PROJECT_NAME" \
+              -Dsonar.host.url=http://s4.java21.net:9000 \
+              -Dsonar.login=${{ secrets.SONAR_TOKEN }} \
+              -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml \
+              ${{ inputs.maven-args }}
+
+          else
+            # -----------------------------------------------------------
+            # 3. 그 외 브랜치 (PR 등): 분석 없이 테스트만 수행
+            # -----------------------------------------------------------
+            echo "🚧 [Build Only] Main/Dev 브랜치가 아닙니다. SonarQube 분석 없이 빌드와 테스트만 수행합니다."
+          
+            # sonar:sonar 제외, verify만 실행하여 빌드/테스트 검증
+            mvn clean verify ${{ inputs.maven-args }}
+          fi
+
+      # 4. Docker Hub 로그인
       - name: Docker Hub 로그인
         if: ${{ inputs.deploy-enabled }}
         uses: docker/login-action@v3
@@ -95,7 +138,7 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      # 5. Docker 이미지 빌드 및 푸시 (deploy-enabled가 true일 때만 실행)
+      # 5. Docker 이미지 빌드 및 푸시
       - name: Docker 이미지 빌드 및 푸시
         if: ${{ inputs.deploy-enabled }}
         uses: docker/build-push-action@v5
@@ -105,7 +148,7 @@ jobs:
           push: true
           tags: ${{ inputs.docker-image }}:latest
 
-      # 6. 서버 접속 및 배포 (deploy-enabled가 true일 때만 실행)
+      # 6. 서버 배포 (SSH)
       - name: 서버 배포 (SSH)
         if: ${{ inputs.deploy-enabled }}
         uses: appleboy/ssh-action@master
