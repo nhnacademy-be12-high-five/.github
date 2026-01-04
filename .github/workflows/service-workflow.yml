@@ -163,35 +163,36 @@ jobs:
               
             SERVICE_BASE="${{ inputs.container-name }}"
             IS_MULTI="${{ inputs.is-multi-instance }}"
-              
-            # 함수: 서비스 인스턴스 하나를 우아하게 종료하고 재배포
-            # 함수: 서비스 인스턴스 하나를 우아하게 종료하고 재배포
+            
             deploy_instance() {
               local SERVICE_NAME=$1
             
-              # [핵심 변경] docker exec용 '실제 컨테이너 이름'을 조합 (폴더명 nhnbook + 접미사 -1)
+              # [핵심] 실제 생성되는 컨테이너 이름 조합 (폴더명 nhnbook + 서비스명 + 순번 1)
+              # 예: coupon-server-1  -->  nhnbook-coupon-server-1-1
               local REAL_CONTAINER_NAME="nhnbook-${SERVICE_NAME}-1"
 
               echo "----------------------------------------------------"
               echo "🔄 [$SERVICE_NAME] 배포 프로세스 시작"
-              echo "🔎 실제 컨테이너 명: $REAL_CONTAINER_NAME"
+              echo "🔎 타겟 컨테이너 명: $REAL_CONTAINER_NAME"
 
-              # 1. Eureka 제외 (여기서는 실제 컨테이너 이름을 써야 함!)
-              echo "🛑 Eureka에서 제외 요청..."
-              docker exec $REAL_CONTAINER_NAME curl -s -X POST "http://localhost:8080/actuator/service-registry?status=OUT_OF_SERVICE" -H "Content-Type: application/json" || echo "⚠️ 실패 (컨테이너 꺼짐)"
+              # 1. Eureka 제외 (실제 컨테이너 이름 사용)
+              echo "🛑 [$SERVICE_NAME] Eureka에서 제외 요청 (OUT_OF_SERVICE)..."
+              docker exec $REAL_CONTAINER_NAME curl -s -X POST "http://localhost:8080/actuator/service-registry?status=OUT_OF_SERVICE" -H "Content-Type: application/json" || echo "⚠️ Actuator 호출 실패 (첫 배포이거나 컨테이너가 꺼져있음)"
 
-              echo "⏳ Gateway 캐시 갱신 대기 (35초)..."
+              echo "⏳ [$SERVICE_NAME] Gateway 캐시 갱신 대기 (35초)..."
               sleep 35
 
-              # 2. 재배포 (여기는 docker-compose 명령이므로 '서비스 이름'을 그대로 써야 함!)
+              # 2. 재배포 (여기는 docker-compose 명령이므로 '서비스 이름' 사용!)
               echo "Contents Update & Restart..."
               docker compose pull $SERVICE_NAME
               docker compose up -d $SERVICE_NAME
 
-              # 3. 헬스체크 (다시 실제 컨테이너 이름으로 확인)
-              echo "🏥 헬스체크 중..."
+              # 3. 헬스체크 (다시 '실제 컨테이너 이름' 사용)
+              echo "🏥 [$SERVICE_NAME] 헬스체크 중..."
               for retry in {1..20}; do
+                # ▼▼▼ 여기가 중요합니다! $REAL_CONTAINER_NAME 을 써야 합니다 ▼▼▼
                 STATUS=$(docker exec $REAL_CONTAINER_NAME curl -s http://localhost:8080/actuator/health | grep '"status":"UP"')
+            
                 if [ -n "$STATUS" ]; then
                   echo "✅ [$SERVICE_NAME] 구동 완료 (UP)!"
                   return 0
@@ -200,7 +201,7 @@ jobs:
                 sleep 5
               done
 
-              echo "❌ 헬스체크 실패! 배포 중단."
+              echo "❌ [$SERVICE_NAME] 헬스체크 실패! ($REAL_CONTAINER_NAME 응답 없음)"
               exit 1
             }
               
