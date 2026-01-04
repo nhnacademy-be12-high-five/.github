@@ -177,7 +177,7 @@ jobs:
 
               # 1. Eureka 제외 (실제 컨테이너 이름 사용)
               echo "🛑 [$SERVICE_NAME] Eureka에서 제외 요청 (OUT_OF_SERVICE)..."
-              docker exec $REAL_CONTAINER_NAME curl -s -X POST "http://localhost:8080/actuator/service-registry?status=OUT_OF_SERVICE" -H "Content-Type: application/json" || echo "⚠️ Actuator 호출 실패 (첫 배포이거나 컨테이너가 꺼져있음)"
+              docker exec $REAL_CONTAINER_NAME curl -s -X POST "http://localhost:8080/actuator/service-registry" -H "Content-Type: application/json" -d '{"status":"OUT_OF_SERVICE"}'
 
               echo "⏳ [$SERVICE_NAME] Gateway 캐시 갱신 대기 (35초)..."
               sleep 35
