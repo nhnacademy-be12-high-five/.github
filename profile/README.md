@@ -5,6 +5,12 @@
   <p>📅 <b>개발 기간</b> : 2025.11.11 ~ 2025.12.31</p>
 </div>
 
+## 📖 도메인
+<a href="https://nhnbook.shop">https://nhnbook.shop</a>
+
+## 📋 API 명세서
+<a href="https://nhnbook.shop/swagger-ui.html">https://nhnbook.shop/swagger-ui.html</a>
+
 ## 👥 팀원
 
 <table align="center">
