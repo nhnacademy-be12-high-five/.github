@@ -152,6 +152,11 @@
 * **Automated Deployment**: 테스트 통과 결과물의 운영 환경 자동 반영.
 * **Health Check**: 배포 직후 서비스 상태를 실시간 확인하여 최종 배포 완료 판정.
 
+## 🧩 ERD 설계
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/7b8b4f6d-9d40-4764-a2d4-668a0d1668fc" width="100%" alt="CI/CD Pipeline"/>
+</p>
+
 ## ✨ 주요 기능 (Key Features)
 
 <details open>
