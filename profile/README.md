@@ -216,7 +216,7 @@
 
 ## ✅ Test Coverage
 <details open>
-<summary><b>1. 프론트엔드 서버</b></summary>
+<summary><b>🌐 1. 프론트엔드 서버</b></summary>
 <br>
 <p align="center">
   <img src="https://github.com/user-attachments/assets/98e88053-1c7e-4c56-8308-1342514b2411" width="100%" alt="Front-Server"/>
@@ -224,7 +224,7 @@
 </details>
 
 <details>
-<summary><b>2. 멤버 서버</b></summary>
+<summary><b>👤 2. 멤버 서버</b></summary>
 <br>
 <p align="center">
   <img src="https://github.com/user-attachments/assets/eb980c1f-48cc-4da5-bc1f-c53f083c4591" width="100%" alt="Member-Server"/>
@@ -232,7 +232,7 @@
 </details>
 
 <details>
-<summary><b>3. 도서 서버</b></summary>
+<summary><b>📚 3. 도서 서버</b></summary>
 <br>
 <p align="center">
   <img src="https://github.com/user-attachments/assets/956d0266-1afd-43b1-bae6-f40a553fb88f" width="100%" alt="Book-Server"/>
@@ -240,7 +240,7 @@
 </details>
 
 <details>
-<summary><b>4. 주문 서버</b></summary>
+<summary><b>📦 4. 주문 서버</b></summary>
 <br>
 <p align="center">
   <img src="https://github.com/user-attachments/assets/8847a397-91da-4d8f-b1c6-15d0420d9987" width="100%" alt="Order-Server"/>
@@ -248,7 +248,7 @@
 </details>
 
 <details>
-<summary><b>5. 결제 서버</b></summary>
+<summary><b>💳 5. 결제 서버</b></summary>
 <br>
 <p align="center">
   <img src="https://github.com/user-attachments/assets/43b8491c-8721-4b70-aba7-2f60f8392233" width="100%" alt="Payment-Server"/>
@@ -256,7 +256,7 @@
 </details>
 
 <details>
-<summary><b>6. 쿠폰 서버</b></summary>
+<summary><b>🎟️ 6. 쿠폰 서버</b></summary>
 <br>
 <p align="center">
   <img src="https://github.com/user-attachments/assets/30b41d6a-e6d1-422a-ae91-c1c636544177" width="100%" alt="Coupon-Server"/>
