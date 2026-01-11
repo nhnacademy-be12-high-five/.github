@@ -154,7 +154,7 @@
 
 ## 🧩 ERD 설계
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/7b8b4f6d-9d40-4764-a2d4-668a0d1668fc" width="100%" alt="CI/CD Pipeline"/>
+  <img src="https://github.com/user-attachments/assets/d1b859ba-9975-4179-ae12-d88eb4562b02" width="100%" alt="CI/CD Pipeline"/>
 </p>
 
 ## ✨ 주요 기능 (Key Features)
