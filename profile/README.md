@@ -50,7 +50,7 @@
           <img src="https://github.com/user-attachments/assets/54967867-f705-461d-9ec5-e93067c25a1d" width="100" height="100" alt="김진영"/>
           <br /><b>김진영</b>
         </a>
-        <br /><sub><b>쿠폰</b></sub>
+        <br /><sub><b>쿠폰 / 도서</b></sub>
       </td>
       <td align="center">
         <a href="https://github.com/songdohyeok">
