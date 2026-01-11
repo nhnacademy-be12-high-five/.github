@@ -19,7 +19,7 @@
       </td>
       <td align="center">
         <a href="https://github.com/ryutaehun">
-          <img src="https://github.com/user-attachments/assets/26034b34-8816-40ab-aa68-e694a4937737" width="100" height="100" alt="류태훈"/>
+          <img src="https://github.com/user-attachments/assets/c944afde-6451-4ef8-bc52-3949ada613d6" width="100" height="100" alt="류태훈"/>
           <br /><b>류태훈</b>
         </a>
         <br /><sub><b>인프라 / 장바구니 / 리뷰</b></sub>
@@ -40,14 +40,14 @@
       </td>
       <td align="center">
         <a href="https://github.com/xxlsheep">
-          <img src="https://github.com/user-attachments/assets/8aab8d65-7059-4691-8d3b-2c44eaf76589" width="100" height="100" alt="김태양"/>
+          <img src="https://github.com/user-attachments/assets/f437ba4a-3c31-4219-bfb9-853dd8a6b953" width="100" height="100" alt="김태양"/>
           <br /><b>김태양</b>
         </a>
         <br /><sub><b>회원 / 인증</b></sub>
       </td>
       <td align="center">
         <a href="https://github.com/Poly-Etilen">
-          <img src="https://github.com/user-attachments/assets/3bffc0e0-fc1b-4e00-a840-a3ab4264a37f" width="100" height="100" alt="김진영"/>
+          <img src="https://github.com/user-attachments/assets/54967867-f705-461d-9ec5-e93067c25a1d" width="100" height="100" alt="김진영"/>
           <br /><b>김진영</b>
         </a>
         <br /><sub><b>쿠폰</b></sub>
