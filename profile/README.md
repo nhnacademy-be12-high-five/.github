@@ -60,7 +60,7 @@
       </td>
       <td align="center">
         <a href="https://github.com/songdohyeok">
-          <img src="https://github.com/user-attachments/assets/1b5449a4-170c-4c43-a5a6-4057efc4146f" width="100" height="100" alt="송도혁"/>
+          <img src="https://github.com/user-attachments/assets/480fa777-ab0f-466f-845b-ceae5d93c39d" width="100" height="100" alt="송도혁"/>
           <br /><b>송도혁</b>
         </a>
         <br /><sub><b>포인트 / 주문 / 결제</b></sub>
