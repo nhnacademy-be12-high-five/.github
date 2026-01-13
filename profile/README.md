@@ -39,7 +39,7 @@
       </td>
       <td align="center">
         <a href="https://github.com/yunaa00">
-          <img src="https://github.com/user-attachments/assets/f9f12c32-6da4-405d-9d18-3c3c62f209c6" width="100" height="100" alt="곽유나"/>
+          <img src="https://github.com/user-attachments/assets/c6db939c-a68b-4240-8f18-3d6dd31a4234" width="100" height="100" alt="곽유나"/>
           <br /><b>곽유나</b>
         </a>
         <br /><sub><b>프론트엔드 / 도서 / 검색</b></sub>
@@ -154,7 +154,7 @@
 
 ## 🧩 ERD 설계
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/d1b859ba-9975-4179-ae12-d88eb4562b02" width="100%" alt="CI/CD Pipeline"/>
+  <img src="https://github.com/user-attachments/assets/789831b5-ab1a-4e0d-b10b-b6cafbbaae0e" width="100%" alt="ERD"/>
 </p>
 
 ## ✨ 주요 기능 (Key Features)
